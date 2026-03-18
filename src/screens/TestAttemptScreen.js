@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
@@ -461,9 +462,11 @@ export default function TestAttemptScreen({ route, navigation }) {
 
   if (!currentSection || !currentQuestionEntry || !currentQuestion || !currentKey) {
     return (
-      <View style={styles.centerState}>
-        <Text style={styles.errorText}>Question data is unavailable.</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.centerState}>
+          <Text style={styles.errorText}>Question data is unavailable.</Text>
+        </View>
+      </SafeAreaView>
     );
   };
 
@@ -492,7 +495,8 @@ export default function TestAttemptScreen({ route, navigation }) {
   }, [currentQuestion?.imageUrl]);
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.root}>
       <View style={styles.header}>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -731,7 +735,8 @@ export default function TestAttemptScreen({ route, navigation }) {
           </View>
         </>
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -745,6 +750,7 @@ function Legend({ label, color, value }) {
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#E9EDF2' },
   root: { flex: 1, backgroundColor: '#E9EDF2' },
   centerState: {
     flex: 1,

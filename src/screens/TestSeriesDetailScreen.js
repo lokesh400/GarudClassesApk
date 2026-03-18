@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import apiClient from '../api/client';
 
@@ -118,137 +119,139 @@ export default function TestSeriesDetailScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backArrow}>{'<'}</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {data.name}
-        </Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {!!data.image && (
-          <Image
-            source={{ uri: data.image }}
-            style={styles.banner}
-            resizeMode="cover"
-          />
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.title}>{data.name}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.root}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backArrow}>{'<'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {data.name}
+          </Text>
+          <View style={{ width: 36 }} />
         </View>
 
-        {!!data.description && (
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {!!data.image && (
+            <Image
+              source={{ uri: data.image }}
+              style={styles.banner}
+              resizeMode="cover"
+            />
+          )}
+
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>About</Text>
-            <Text style={styles.description}>{data.description}</Text>
+            <Text style={styles.title}>{data.name}</Text>
           </View>
-        )}
 
-        {loading && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#1E3A8A" />
-            <Text style={styles.loadingText}>Loading details...</Text>
-          </View>
-        )}
+          {!!data.description && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>About</Text>
+              <Text style={styles.description}>{data.description}</Text>
+            </View>
+          )}
 
-        {!!error && <Text style={styles.errorText}>{error}</Text>}
+          {loading && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#1E3A8A" />
+              <Text style={styles.loadingText}>Loading details...</Text>
+            </View>
+          )}
 
-        {!loading && detail && (
-          <>
-            {!!detail.subject && (
-              <InfoRow label="Subject" value={detail.subject} />
-            )}
-            {!!detail.targetExam && (
-              <InfoRow label="Target Exam" value={detail.targetExam} />
-            )}
-            {!!detail.totalTests && (
-              <InfoRow label="Total Tests" value={String(detail.totalTests)} />
-            )}
-            {!!detail.validity && (
-              <InfoRow label="Validity" value={detail.validity} />
-            )}
-            {!!detail.price && (
-              <InfoRow label="Price" value={`₹${detail.price}`} />
-            )}
-            {!!detail.language && (
-              <InfoRow label="Medium" value={detail.language} />
-            )}
-            {!!detail.createdAt && (
-              <InfoRow
-                label="Added on"
-                value={new Date(detail.createdAt).toLocaleDateString('en-IN', {
-                  day: 'numeric', month: 'short', year: 'numeric',
-                })}
-              />
-            )}
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-            {tests.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Tests ({tests.length})</Text>
-                {tests.map((test, i) => {
-                  const running = busyTestId === test._id;
-                  const canViewResult = !!test.attempted;
-                  const primaryLabel = test.attempted && test.mode === 'practice' ? 'Retry' : 'Start';
+          {!loading && detail && (
+            <>
+              {!!detail.subject && (
+                <InfoRow label="Subject" value={detail.subject} />
+              )}
+              {!!detail.targetExam && (
+                <InfoRow label="Target Exam" value={detail.targetExam} />
+              )}
+              {!!detail.totalTests && (
+                <InfoRow label="Total Tests" value={String(detail.totalTests)} />
+              )}
+              {!!detail.validity && (
+                <InfoRow label="Validity" value={detail.validity} />
+              )}
+              {!!detail.price && (
+                <InfoRow label="Price" value={`₹${detail.price}`} />
+              )}
+              {!!detail.language && (
+                <InfoRow label="Medium" value={detail.language} />
+              )}
+              {!!detail.createdAt && (
+                <InfoRow
+                  label="Added on"
+                  value={new Date(detail.createdAt).toLocaleDateString('en-IN', {
+                    day: 'numeric', month: 'short', year: 'numeric',
+                  })}
+                />
+              )}
 
-                  return (
-                  <View key={test._id ?? i} style={styles.testRow}>
-                    <View style={styles.testIndex}>
-                      <Text style={styles.testIndexText}>{i + 1}</Text>
-                    </View>
-                    <View style={styles.testInfo}>
-                      <Text style={styles.testName}>{test.name || test.title || `Test ${i + 1}`}</Text>
-                      {!!test.duration && (
-                        <Text style={styles.testMeta}>{test.duration} mins</Text>
-                      )}
-                      {!!test.mode && (
-                        <Text style={styles.testMeta}>Mode: {test.mode}</Text>
-                      )}
-                    </View>
+              {tests.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Tests ({tests.length})</Text>
+                  {tests.map((test, i) => {
+                    const running = busyTestId === test._id;
+                    const canViewResult = !!test.attempted;
+                    const primaryLabel = test.attempted && test.mode === 'practice' ? 'Retry' : 'Start';
 
-                    <View style={styles.testActions}>
-                      <TouchableOpacity
-                        style={[styles.startBtn, running && styles.startBtnDisabled]}
-                        onPress={() => startTest(test)}
-                        disabled={running}
-                      >
-                        {running ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={styles.startBtnText}>{primaryLabel}</Text>
+                    return (
+                    <View key={test._id ?? i} style={styles.testRow}>
+                      <View style={styles.testIndex}>
+                        <Text style={styles.testIndexText}>{i + 1}</Text>
+                      </View>
+                      <View style={styles.testInfo}>
+                        <Text style={styles.testName}>{test.name || test.title || `Test ${i + 1}`}</Text>
+                        {!!test.duration && (
+                          <Text style={styles.testMeta}>{test.duration} mins</Text>
                         )}
-                      </TouchableOpacity>
+                        {!!test.mode && (
+                          <Text style={styles.testMeta}>Mode: {test.mode}</Text>
+                        )}
+                      </View>
 
-                      {canViewResult && (
+                      <View style={styles.testActions}>
                         <TouchableOpacity
-                          style={styles.resultBtn}
-                          onPress={() => navigation.navigate('TestResult', { testId: test._id })}
+                          style={[styles.startBtn, running && styles.startBtnDisabled]}
+                          onPress={() => startTest(test)}
+                          disabled={running}
                         >
-                          <Text style={styles.resultBtnText}>Result</Text>
+                          {running ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.startBtnText}>{primaryLabel}</Text>
+                          )}
                         </TouchableOpacity>
-                      )}
+
+                        {canViewResult && (
+                          <TouchableOpacity
+                            style={styles.resultBtn}
+                            onPress={() => navigation.navigate('TestResult', { testId: test._id })}
+                          >
+                            <Text style={styles.resultBtnText}>Result</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                );
-                })}
-              </View>
-            )}
+                  );
+                  })}
+                </View>
+              )}
 
-            {!tests.length && (
-              <View style={styles.section}>
-                <Text style={styles.description}>No tests are available in this batch yet.</Text>
-              </View>
-            )}
-          </>
-        )}
+              {!tests.length && (
+                <View style={styles.section}>
+                  <Text style={styles.description}>No tests are available in this batch yet.</Text>
+                </View>
+              )}
+            </>
+          )}
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </View>
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -262,6 +265,7 @@ function InfoRow({ label, value }) {
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
   root: { flex: 1, backgroundColor: '#F3F4F6' },
 
   header: {
