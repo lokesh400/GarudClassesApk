@@ -1,19 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AppHeader from '../components/AppHeader';
 
 export default function DownloadsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AppHeader title="My Downloads" navigation={navigation} showBack />
       <View style={styles.root}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>{'<'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>My Downloads</Text>
-          <View style={styles.backBtnPlaceholder} />
-        </View>
-
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyIcon}>⬇</Text>
           <Text style={styles.emptyTitle}>No Downloads Yet</Text>

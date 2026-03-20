@@ -103,7 +103,8 @@ export default function DashboardScreen({ navigation }) {
 
               <View style={styles.menuSection}>
                 <Text style={styles.menuSectionTitle}>Account</Text>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => openSoon('My Profile')}>
+                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('MyProfile'); }}>
+                  <MaterialCommunityIcons name="account-circle-outline" size={20} color="#1D4ED8" style={{marginRight: 10}} />
                   <Text style={styles.menuActionText}>My Profile</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -113,16 +114,19 @@ export default function DashboardScreen({ navigation }) {
                     navigation.navigate('Batches', { screen: 'MyPurchases' });
                   }}
                 >
+                  <MaterialCommunityIcons name="cart-outline" size={20} color="#1D4ED8" style={{marginRight: 10}} />
                   <Text style={styles.menuActionText}>My Purchases</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.menuSection}>
                 <Text style={styles.menuSectionTitle}>Essentials</Text>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => openSoon('Help & Support')}>
+                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('HelpSupport'); }}>
+                  <MaterialCommunityIcons name="lifebuoy" size={20} color="#1D4ED8" style={{marginRight: 10}} />
                   <Text style={styles.menuActionText}>Help & Support</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => openSoon('Settings')}>
+                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('Settings'); }}>
+                  <MaterialCommunityIcons name="cog-outline" size={20} color="#1D4ED8" style={{marginRight: 10}} />
                   <Text style={styles.menuActionText}>Settings</Text>
                 </TouchableOpacity>
               </View>
@@ -335,8 +339,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   menuActionBtn: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0,
+    borderColor: 'transparent',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,

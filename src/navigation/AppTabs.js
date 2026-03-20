@@ -1,9 +1,12 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+
 import BatchesStack from './BatchesStack';
-import DashboardScreen from '../screens/DashboardScreen';
+import DashboardStack from './DashboardStack';
+import OttTabs from './OttTabs';
 
 const Tab = createBottomTabNavigator();
 
@@ -13,11 +16,12 @@ const baseTabBarStyle = {
   borderTopWidth: 1,
   height: 60,
   paddingBottom: 8,
+  elevation: 8,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 6,
 };
-
-function TabIcon({ emoji }) {
-  return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
-}
 
 export default function AppTabs() {
   return (
@@ -33,11 +37,11 @@ export default function AppTabs() {
     >
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
+        component={DashboardStack}
         options={{
           tabBarLabel: 'Dashboard',
-          tabBarIcon: () => (
-            <TabIcon emoji="🏠" />
+          tabBarIcon: ({ color, size, focused }) => (
+            <MaterialCommunityIcons name={focused ? 'view-dashboard' : 'view-dashboard-outline'} size={28} color={color} />
           ),
         }}
       />
@@ -51,8 +55,8 @@ export default function AppTabs() {
 
           return {
             tabBarLabel: 'Batches',
-            tabBarIcon: () => (
-              <TabIcon emoji='📖' />
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'book-open-variant' : 'book-outline'} size={28} color={color} />
             ),
             popToTopOnBlur: true,
             unmountOnBlur: true,
@@ -60,6 +64,17 @@ export default function AppTabs() {
               ? { ...baseTabBarStyle, display: 'none' }
               : baseTabBarStyle,
           };
+        }}
+      />
+      <Tab.Screen
+        name="OTT"
+        component={OttTabs}
+        options={{
+          tabBarLabel: 'OTT',
+          tabBarIcon: ({ color, size, focused }) => (
+            <MaterialCommunityIcons name={focused ? 'play-box' : 'play-box-outline'} size={28} color={color} />
+          ),
+          tabBarStyle: { ...baseTabBarStyle, display: 'none' },
         }}
       />
     </Tab.Navigator>

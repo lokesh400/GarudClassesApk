@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../components/AppHeader';
 import apiClient from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
@@ -496,13 +497,8 @@ export default function TestAttemptScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AppHeader title={test.name} navigation={navigation} showBack />
       <View style={styles.root}>
-      <View style={styles.header}>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {test.name}
-          </Text>
-        </View>
         <View style={styles.topRightWrap}>
           <Text style={[styles.timerChip, timeLeft <= 300 && styles.timerChipDanger]}>{timerDisplay}</Text>
           <TouchableOpacity
@@ -513,7 +509,6 @@ export default function TestAttemptScreen({ route, navigation }) {
             <Text style={styles.menuBtnText}>☰</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
      <View>
       <View style={styles.paletteCardTop}>
@@ -759,28 +754,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  header: {
-    backgroundColor: '#0D2C66',
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.14)',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  headerCenter: { flex: 1, paddingRight: 10 },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
+  // header styles removed (now using AppHeader)
   topRightWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuBtn: {
     width: 34,

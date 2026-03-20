@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../components/AppHeader';
 import { useAuth } from '../auth/AuthContext';
 import apiClient from '../api/client';
 
@@ -120,17 +121,8 @@ export default function TestSeriesDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AppHeader title={data.name} navigation={navigation} showBack />
       <View style={styles.root}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backArrow}>{'<'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {data.name}
-          </Text>
-          <View style={{ width: 36 }} />
-        </View>
-
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {!!data.image && (
             <Image
@@ -153,7 +145,7 @@ export default function TestSeriesDetailScreen({ route, navigation }) {
 
           {loading && (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#1E3A8A" />
+              <ActivityIndicator size="small" color="#1D4ED8" />
               <Text style={styles.loadingText}>Loading details...</Text>
             </View>
           )}
@@ -268,32 +260,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
   root: { flex: 1, backgroundColor: '#F3F4F6' },
 
-  header: {
-    backgroundColor: '#1E3A8A',
-    paddingTop: 16,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backArrow: { color: '#fff', fontSize: 20, lineHeight: 22, fontWeight: '700' },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    marginHorizontal: 8,
-  },
+  // header styles removed (now using AppHeader)
 
   scroll: { paddingBottom: 24 },
 

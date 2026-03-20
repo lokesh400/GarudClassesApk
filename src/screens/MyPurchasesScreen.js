@@ -49,9 +49,7 @@ export default function MyPurchasesScreen({ navigation }) {
     if (!isRefresh) setLoading(true);
     setError('');
     try {
-      const res = await apiClient.get('/purchase/my', {
-        params: { itemType: 'TestSeries' },
-      });
+      const res = await apiClient.get('/purchase/my');
       setPurchases(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       if (e.response?.status === 401) {

@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../components/AppHeader';
 import { useAuth } from '../auth/AuthContext';
 import apiClient from '../api/client';
 
@@ -81,11 +82,22 @@ export default function BatchesScreen({ navigation }) {
     </View>
   );
 
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => navigation && navigation.goBack && navigation.goBack()}>
+        <MaterialCommunityIcons name="arrow-left" size={24} color="#1D4ED8" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>My Batches</Text>
+      <View style={styles.backBtnPlaceholder} />
+    </View>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <AppHeader title="My Batches" navigation={navigation} showBack />
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
+          <ActivityIndicator size="large" color="#1D4ED8" />
           <Text style={styles.loadingText}>Loading your batches...</Text>
         </View>
       </SafeAreaView>
@@ -95,6 +107,7 @@ export default function BatchesScreen({ navigation }) {
   if (error) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <AppHeader title="My Batches" navigation={navigation} showBack />
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchBatches()}>
@@ -107,13 +120,8 @@ export default function BatchesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AppHeader title="My Batches" navigation={navigation} showBack />
       <View style={styles.root}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Batches</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
         <FlatList
           data={batches}
           keyExtractor={(item, index) => String(item._id ?? item.id ?? index)}
@@ -135,23 +143,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
   root: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  header: {
-    backgroundColor: '#1E3A8A',
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  logoutButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  // header styles removed (now using AppHeader)
   listContent: { padding: 16 },
 
   // Card
