@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -7,6 +6,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import BatchesStack from './BatchesStack';
 import DashboardStack from './DashboardStack';
 import OttTabs from './OttTabs';
+import BattlegroundStack from './BattlegroundStack';
 
 const Tab = createBottomTabNavigator();
 
@@ -75,6 +75,24 @@ export default function AppTabs() {
             <MaterialCommunityIcons name={focused ? 'play-box' : 'play-box-outline'} size={28} color={color} />
           ),
           tabBarStyle: { ...baseTabBarStyle, display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="Battleground"
+        component={BattlegroundStack}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) || 'BattlegroundMain';
+          const hideTabBar = routeName === 'BattlegroundAttempt';
+
+          return {
+            tabBarLabel: 'Battleground',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'sword-cross' : 'sword'} size={28} color={color} />
+            ),
+            tabBarStyle: hideTabBar
+              ? { ...baseTabBarStyle, display: 'none' }
+              : baseTabBarStyle,
+          };
         }}
       />
     </Tab.Navigator>

@@ -497,19 +497,38 @@ export default function TestAttemptScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <AppHeader title={test.name} navigation={navigation} showBack />
-      <View style={styles.root}>
-        <View style={styles.topRightWrap}>
-          <Text style={[styles.timerChip, timeLeft <= 300 && styles.timerChipDanger]}>{timerDisplay}</Text>
+      <AppHeader
+        title={test.name}
+        titleAlign="left"
+        navigation={navigation}
+        left={
           <TouchableOpacity
-            style={styles.menuBtn}
+            style={[styles.menuBtn, { backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 0, elevation: 4, shadowColor: '#000' }]}
             onPress={() => setStatsMenuOpen(true)}
             activeOpacity={0.8}
           >
-            <Text style={styles.menuBtnText}>☰</Text>
+            <Text style={[styles.menuBtnText, { color: '#1D4ED8' }]}>☰</Text>
           </TouchableOpacity>
-        </View>
-
+        }
+        right={
+          <Text
+            style={[
+              styles.timerChip,
+              {
+                backgroundColor: 'rgba(255,255,255,0.92)',
+                color: timeLeft <= 300 ? '#EF4444' : '#1D4ED8',
+                borderColor: timeLeft <= 300 ? '#EF4444' : '#1D4ED8',
+                fontWeight: 'bold',
+              },
+              timeLeft <= 300 && styles.timerChipDanger,
+            ]}
+          >
+            {timerDisplay}
+          </Text>
+        }
+        style={{backgroundColor: 'transparent', borderBottomWidth: 0, elevation: 0, shadowOpacity: 0}}
+      />
+      <View style={styles.root}>
      <View>
       <View style={styles.paletteCardTop}>
         <View style={styles.paletteGrid}>
@@ -755,7 +774,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   // header styles removed (now using AppHeader)
-  topRightWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuBtn: {
     width: 34,
     height: 34,

@@ -81,7 +81,7 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity
             style={styles.tileCard}
             activeOpacity={0.85}
-            onPress={() => Alert.alert('Battlegrounds', 'Battlegrounds module will be added next.')}
+            onPress={() => navigation.navigate('Battleground')}
           >
             <View style={styles.tileIconWrap}>
               <MaterialCommunityIcons name="sword-cross" size={30} color="#000000" />
