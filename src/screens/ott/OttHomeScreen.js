@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Linking, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Linking, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ export default function OttHomeScreen({ navigation }) {
   const [myVisibleCount, setMyVisibleCount] = useState(4);
   const [exploreVisibleCount, setExploreVisibleCount] = useState(4);
   const [failedImageByCourseId, setFailedImageByCourseId] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -75,14 +76,35 @@ export default function OttHomeScreen({ navigation }) {
     [myCourses]
   );
 
+  const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+
+  useEffect(() => {
+    setMyVisibleCount(4);
+    setExploreVisibleCount(4);
+  }, [normalizedQuery]);
+
+  const myFilteredCourses = useMemo(() => {
+    if (!normalizedQuery) return myCourses;
+    return myCourses.filter((course) =>
+      String(course?.name || '').toLowerCase().includes(normalizedQuery)
+    );
+  }, [myCourses, normalizedQuery]);
+
+  const exploreFilteredCourses = useMemo(() => {
+    if (!normalizedQuery) return exploreCourses;
+    return exploreCourses.filter((course) =>
+      String(course?.name || '').toLowerCase().includes(normalizedQuery)
+    );
+  }, [exploreCourses, normalizedQuery]);
+
   const myVisibleCourses = useMemo(
-    () => myCourses.slice(0, myVisibleCount),
-    [myCourses, myVisibleCount]
+    () => myFilteredCourses.slice(0, myVisibleCount),
+    [myFilteredCourses, myVisibleCount]
   );
 
   const exploreVisibleCourses = useMemo(
-    () => exploreCourses.slice(0, exploreVisibleCount),
-    [exploreCourses, exploreVisibleCount]
+    () => exploreFilteredCourses.slice(0, exploreVisibleCount),
+    [exploreFilteredCourses, exploreVisibleCount]
   );
 
   const formatRupees = (value) => {
@@ -240,6 +262,7 @@ export default function OttHomeScreen({ navigation }) {
 
   const purchasedCount = myCourses.length;
   const exploreCount = exploreCourses.length;
+  const hasAnyFilteredResults = myFilteredCourses.length > 0 || exploreFilteredCourses.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -274,6 +297,31 @@ export default function OttHomeScreen({ navigation }) {
                 <Text style={styles.heroPillLabel}>Explore</Text>
               </View>
             </View>
+
+            <View style={styles.searchWrap}>
+              <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search courses..."
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <MaterialCommunityIcons name="close-circle" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {searchQuery.trim().length > 0 && (
+              <Text style={styles.searchMetaText}>
+                {hasAnyFilteredResults
+                  ? `Showing results for "${searchQuery.trim()}"`
+                  : `No courses found for "${searchQuery.trim()}"`}
+              </Text>
+            )}
           </View>
 
           <View style={styles.sectionHeadRow}>
@@ -281,15 +329,17 @@ export default function OttHomeScreen({ navigation }) {
             <Text style={styles.sectionHint}>Continue learning</Text>
           </View>
 
-          {myCourses.length === 0 ? (
-            <Text style={styles.emptyText}>You have not purchased any courses yet.</Text>
+          {myFilteredCourses.length === 0 ? (
+            <Text style={styles.emptyText}>
+              {normalizedQuery ? 'No purchased course matches your search.' : 'You have not purchased any courses yet.'}
+            </Text>
           ) : (
             <>
               <View style={styles.gridWrap}>
                 {myVisibleCourses.map((item, index) => renderCard(item, index, 'my'))}
               </View>
 
-              {myVisibleCount < myCourses.length && (
+              {myVisibleCount < myFilteredCourses.length && (
                 <TouchableOpacity
                   style={styles.showMoreButton}
                   onPress={() => setMyVisibleCount((prev) => prev + 4)}
@@ -305,15 +355,17 @@ export default function OttHomeScreen({ navigation }) {
             <Text style={styles.sectionHint}>Find your next track</Text>
           </View>
 
-          {exploreCourses.length === 0 ? (
-            <Text style={styles.emptyText}>No explore courses available right now.</Text>
+          {exploreFilteredCourses.length === 0 ? (
+            <Text style={styles.emptyText}>
+              {normalizedQuery ? 'No explore course matches your search.' : 'No explore courses available right now.'}
+            </Text>
           ) : (
             <>
               <View style={styles.gridWrap}>
                 {exploreVisibleCourses.map((item, index) => renderCard(item, index, 'explore'))}
               </View>
 
-              {exploreVisibleCount < exploreCourses.length && (
+              {exploreVisibleCount < exploreFilteredCourses.length && (
                 <TouchableOpacity
                   style={styles.showMoreButton}
                   onPress={() => setExploreVisibleCount((prev) => prev + 4)}
@@ -363,6 +415,31 @@ const styles = StyleSheet.create({
   heroStatsRow: {
     marginTop: 12,
     flexDirection: 'row',
+  },
+  searchWrap: {
+    marginTop: 12,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+    paddingVertical: 10,
+  },
+  searchMetaText: {
+    marginTop: 8,
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '600',
   },
   heroPill: {
     paddingVertical: 8,

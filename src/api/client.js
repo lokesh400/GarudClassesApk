@@ -1,20 +1,25 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const COOKIE_KEY = 'session_cookie';
 
-// const API_BASE_URL = 'http://10.191.44.198:5000/api';
-
-const API_BASE_URL = 'https://testportal.garudclasses.com/api';
+const API_BASE_URL = 'http://10.173.40.198:5000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  // Browser requires credentials mode for cookie-based auth.
+  withCredentials: true,
 });
 
 // REQUEST INTERCEPTOR
 // Reads stored session cookie and injects it as the Cookie header on every request.
 apiClient.interceptors.request.use(async (config) => {
+  if (Platform.OS === 'web') {
+    return config;
+  }
+
   const cookie = await AsyncStorage.getItem(COOKIE_KEY);
   if (cookie) {
     config.headers['Cookie'] = cookie;
@@ -28,6 +33,10 @@ apiClient.interceptors.request.use(async (config) => {
 // and stores it in AsyncStorage for future requests.
 apiClient.interceptors.response.use(
   async (response) => {
+    if (Platform.OS === 'web') {
+      return response;
+    }
+
     const setCookieHeader = response.headers['set-cookie'];
     if (setCookieHeader) {
       const raw = Array.isArray(setCookieHeader)
