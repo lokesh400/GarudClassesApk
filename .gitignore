@@ -5,6 +5,7 @@ node_modules/
 .expo/
 dist/
 web-build/
+.vercel/
 expo-env.d.ts
 
 # Native
@@ -37,3 +38,4 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+.vercel

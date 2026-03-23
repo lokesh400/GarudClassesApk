@@ -52,9 +52,10 @@ export default function BatchesScreen({ navigation }) {
     fetchBatches(true);
   };
 
+  const totalBatches = batches.length;
+
   const renderBatch = ({ item }) => (
     <View style={styles.card}>
-      {/* Banner image */}
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="cover" />
       ) : (
@@ -76,26 +77,21 @@ export default function BatchesScreen({ navigation }) {
           onPress={() => navigation.navigate('TestSeriesDetail', { item })}
           activeOpacity={0.85}
         >
-          <Text style={styles.studyButtonText}>Study →</Text>
+          <Text style={styles.studyButtonText}>Continue Learning</Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
-
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation && navigation.goBack && navigation.goBack()}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color="#1D4ED8" />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>My Batches</Text>
-      <View style={styles.backBtnPlaceholder} />
     </View>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <AppHeader title="My Batches" navigation={navigation} showBack />
+        <AppHeader
+          title="My Batches"
+          navigation={navigation}
+          showBack={true}
+          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        />
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#1D4ED8" />
           <Text style={styles.loadingText}>Loading your batches...</Text>
@@ -107,7 +103,12 @@ export default function BatchesScreen({ navigation }) {
   if (error) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <AppHeader title="My Batches" navigation={navigation} showBack />
+        <AppHeader
+          title="My Batches"
+          navigation={navigation}
+          showBack={true}
+          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        />
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchBatches()}>
@@ -120,8 +121,19 @@ export default function BatchesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <AppHeader title="My Batches" navigation={navigation} showBack />
+      <AppHeader
+        title="My Batches"
+        navigation={navigation}
+        showBack={true}
+        right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+      />
       <View style={styles.root}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>YOUR STUDY TRACKS</Text>
+          <Text style={styles.summaryValue}>{totalBatches}</Text>
+          <Text style={styles.summarySubText}>Batches available to continue</Text>
+        </View>
+
         <FlatList
           data={batches}
           keyExtractor={(item, index) => String(item._id ?? item.id ?? index)}
@@ -140,53 +152,86 @@ export default function BatchesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
+  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  // header styles removed (now using AppHeader)
-  listContent: { padding: 16 },
+  summaryCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: '#1D4ED8',
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  summaryValue: {
+    marginTop: 4,
+    fontSize: 28,
+    color: '#1E3A8A',
+    fontWeight: '900',
+  },
+  summarySubText: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '700',
+  },
+  listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 18 },
 
-  // Card
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     marginBottom: 16,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 5,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
   },
-  cardImage: { width: '100%', height: 160 },
+  cardImage: { width: '100%', height: 170 },
   cardImagePlaceholder: {
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardImagePlaceholderText: { color: '#9CA3AF', fontSize: 13 },
+  cardImagePlaceholderText: { color: '#94A3B8', fontSize: 13, fontWeight: '700' },
   cardBody: { padding: 14 },
-  batchName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  batchDescription: { fontSize: 13, color: '#6B7280', lineHeight: 18, marginBottom: 12 },
+  batchName: { fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 6 },
+  batchDescription: { fontSize: 13, color: '#64748B', lineHeight: 19, marginBottom: 12 },
 
-  // Study button
   studyButton: {
-    backgroundColor: '#1E3A8A',
-    borderRadius: 8,
-    paddingVertical: 10,
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    paddingVertical: 11,
     alignItems: 'center',
   },
-  studyButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  studyButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
 
-  // States
   loadingText: { marginTop: 12, fontSize: 14, color: '#6B7280' },
   errorText: { fontSize: 15, color: '#B91C1C', textAlign: 'center', marginBottom: 16 },
   retryButton: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#1D4ED8',
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  retryText: { color: '#fff', fontWeight: '600' },
-  emptyText: { fontSize: 15, color: '#9CA3AF' },
+  retryText: { color: '#FFFFFF', fontWeight: '700' },
+  emptyText: { fontSize: 15, color: '#94A3B8', fontWeight: '700' },
 });

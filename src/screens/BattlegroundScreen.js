@@ -76,7 +76,22 @@ export default function BattlegroundScreen({ navigation }) {
         navigation={navigation}
         showBack={true}
         right={
-          <Image source={require('../../assets/icon.png')} style={{ width: 32, height: 32, borderRadius: 8 }} />
+          <View style={styles.headerRightWrap}>
+            <View style={styles.streakHeaderPill}>
+              <MaterialCommunityIcons name="fire" size={14} color="#F97316" />
+              <Text style={styles.streakHeaderText}>{streak.currentStreak}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.helpTopBtn}
+              onPress={() => navigation.navigate('BattlegroundPrizes', { currentStreak: streak.currentStreak })}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.helpTopBtnText}>?</Text>
+            </TouchableOpacity>
+
+            <Image source={require('../../assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 8 }} />
+          </View>
         }
       />
 
@@ -185,13 +200,6 @@ export default function BattlegroundScreen({ navigation }) {
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.leaderboardBtn}
-          onPress={() => navigation.navigate('BattlegroundPrizes', { currentStreak: streak.currentStreak })}
-        >
-          <Text style={styles.leaderboardText}>Explore Prizes Roadmap</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchTodayQuiz}>
           <Text style={styles.refreshBtnText}>Refresh Today's Quiz</Text>
         </TouchableOpacity>
@@ -203,6 +211,42 @@ export default function BattlegroundScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollContent: { paddingBottom: 36, position: 'relative' },
+  headerRightWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  streakHeaderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  streakHeaderText: {
+    color: '#9A3412',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  helpTopBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  helpTopBtnText: {
+    color: '#1D4ED8',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   bgOrbOne: {
     position: 'absolute',
     top: 18,
@@ -380,19 +424,6 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: '#1E293B', fontWeight: '800', fontSize: 15, marginBottom: 5 },
   emptyText: { color: '#64748B', textAlign: 'center', fontSize: 13 },
-  leaderboardBtn: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 14,
-    padding: 15,
-    alignItems: 'center',
-    backgroundColor: '#FB923C',
-    shadowColor: '#FB923C',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  leaderboardText: { color: '#431407', fontWeight: '800', fontSize: 16, letterSpacing: 0.3 },
   refreshBtn: {
     alignSelf: 'center',
     marginTop: 12,

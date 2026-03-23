@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Linking, ScrollView, TextInput } from 'react-native';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, ActivityIndicator, Alert, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AppHeader from '../../components/AppHeader';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import apiClient from '../../api/client';
@@ -30,14 +31,7 @@ export default function OttHomeScreen({ navigation }) {
   const [failedImageByCourseId, setFailedImageByCourseId] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  }, []);
-
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     setLoading(true);
     try {
       const [myRes, exploreRes] = await Promise.all([
@@ -65,11 +59,11 @@ export default function OttHomeScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCourses();
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    fetchCourses();
+  }, [fetchCourses]));
 
   const purchasedCourseIds = useMemo(
     () => new Set(myCourses.map((item) => String(item?._id || item?.id || ''))),
@@ -107,27 +101,6 @@ export default function OttHomeScreen({ navigation }) {
     [exploreFilteredCourses, exploreVisibleCount]
   );
 
-  const formatRupees = (value) => {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return 'Price on website';
-    return `Rs. ${n}`;
-  };
-
-  const resolveCoursePrice = (course) => (
-    course?.price ?? course?.amount ?? course?.coursePrice ?? course?.mrp ?? course?.cost
-  );
-
-  const resolveBuyLink = (course) => {
-    const raw =
-      course?.buyLink ||
-      course?.websiteUrl ||
-      course?.purchaseUrl ||
-      course?.checkoutUrl ||
-      course?.link ||
-      '';
-    return String(raw).trim();
-  };
-
   const resolveCourseImageUri = (course) => {
     const raw = String(
       course?.image ||
@@ -155,30 +128,11 @@ export default function OttHomeScreen({ navigation }) {
     if (!courseId) return;
 
     if (!purchased) {
-      Alert.alert('Purchase Required', 'Please buy this course from website to access lessons.');
+      Alert.alert('Locked', 'This course is locked');
       return;
     }
 
     navigation.navigate('OttCourseDetail', { courseId, purchased: true });
-  };
-
-  const handleBuyOnWebsite = async (course) => {
-    const buyLink = resolveBuyLink(course);
-    if (!buyLink) {
-      Alert.alert('Link Not Available', 'Buy link is not available for this course right now.');
-      return;
-    }
-
-    try {
-      const supported = await Linking.canOpenURL(buyLink);
-      if (!supported) {
-        Alert.alert('Invalid Link', 'Cannot open the website link for this course.');
-        return;
-      }
-      await Linking.openURL(buyLink);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to open website link.');
-    }
   };
 
   const onCourseImageError = (courseId) => {
@@ -195,7 +149,6 @@ export default function OttHomeScreen({ navigation }) {
       Array.isArray(item?.lectures) ? item.lectures.length :
       Array.isArray(item?.videolist) ? item.videolist.length :
       0;
-    const priceLabel = formatRupees(resolveCoursePrice(item));
     const imageUri = resolveCourseImageUri(item);
     const useFallbackImage = !imageUri || !!failedImageByCourseId[courseId];
     const imageSource = useFallbackImage ? COURSE_IMAGE : { uri: imageUri };
@@ -221,7 +174,7 @@ export default function OttHomeScreen({ navigation }) {
             <View style={[styles.premiumTag, { backgroundColor: item.palette?.tag || '#1D4ED8' }]}>
               <Text style={styles.premiumTagText}>{isPurchased ? 'MY COURSE' : 'EXPLORE'}</Text>
             </View>
-            <MaterialCommunityIcons name={isPurchased ? 'play-circle' : 'cart-outline'} size={20} color="#0F172A" />
+            <MaterialCommunityIcons name={isPurchased ? 'play-circle' : 'lock-outline'} size={20} color="#0F172A" />
           </View>
 
           <Image
@@ -233,25 +186,16 @@ export default function OttHomeScreen({ navigation }) {
 
           <Text style={styles.cardTitleSmall} numberOfLines={2}>{item.name || 'Course'}</Text>
 
-          <View style={styles.cardFooterRow}>
+          <View style={styles.cardFooterWrap}>
             {isPurchased ? (
-              <>
+              <View style={styles.cardFooterRow}>
                 <Text style={styles.footerLabel}>{lessonCount} lessons</Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#334155" />
-              </>
+              </View>
             ) : (
-              <View style={styles.purchaseWrap}>
-                <Text style={styles.priceText}>{priceLabel}</Text>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  style={styles.buyButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleBuyOnWebsite(item);
-                  }}
-                >
-                  <Text style={styles.buyButtonText}>Buy On Website</Text>
-                </TouchableOpacity>
+              <View style={styles.lockedButton}>
+                <MaterialCommunityIcons name="lock" size={14} color="#334155" />
+                <Text style={styles.lockedButtonText}>This course is locked</Text>
               </View>
             )}
           </View>
@@ -260,8 +204,6 @@ export default function OttHomeScreen({ navigation }) {
     );
   };
 
-  const purchasedCount = myCourses.length;
-  const exploreCount = exploreCourses.length;
   const hasAnyFilteredResults = myFilteredCourses.length > 0 || exploreFilteredCourses.length > 0;
 
   return (
@@ -284,20 +226,6 @@ export default function OttHomeScreen({ navigation }) {
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.heroWrap}>
-            <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.heroTitle}>Welcome To Premium Learning</Text>
-            <Text style={styles.heroSubTitle}>Learn daily with cinematic-quality lectures and structured modules.</Text>
-            <View style={styles.heroStatsRow}>
-              <View style={styles.heroPill}>
-                <Text style={styles.heroPillNumber}>{purchasedCount}</Text>
-                <Text style={styles.heroPillLabel}>Purchased</Text>
-              </View>
-              <View style={styles.heroPill}>
-                <Text style={styles.heroPillNumber}>{exploreCount}</Text>
-                <Text style={styles.heroPillLabel}>Explore</Text>
-              </View>
-            </View>
-
             <View style={styles.searchWrap}>
               <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
               <TextInput
@@ -384,40 +312,10 @@ export default function OttHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   heroWrap: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  greeting: {
-    color: '#1D4ED8',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    marginTop: 4,
-    color: '#0F172A',
-    fontSize: 23,
-    fontWeight: '800',
-    lineHeight: 31,
-  },
-  heroSubTitle: {
-    marginTop: 6,
-    color: '#475569',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  heroStatsRow: {
-    marginTop: 12,
-    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 8,
   },
   searchWrap: {
-    marginTop: 12,
     minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
@@ -439,29 +337,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#475569',
     fontSize: 12,
-    fontWeight: '600',
-  },
-  heroPill: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    marginRight: 8,
-    minWidth: 96,
-  },
-  heroPillNumber: {
-    color: '#1D4ED8',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  heroPillLabel: {
-    color: '#64748B',
-    fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   sectionHeadRow: {
     marginTop: 8,
@@ -471,7 +347,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heading: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1E293B',
     marginLeft: 16,
@@ -481,7 +357,7 @@ const styles = StyleSheet.create({
   sectionHint: {
     fontSize: 12,
     color: '#1D4ED8',
-    fontWeight: '700',
+    fontWeight: '800',
   },
 
   loadingContainer: {
@@ -509,14 +385,14 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: GRID_GAP,
     borderWidth: 1,
-    shadowColor: '#0F172A',
+    shadowColor: '#0B1220',
     shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.09,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 13,
+    elevation: 6,
     overflow: 'hidden',
   },
   cardTouchable: {
@@ -532,7 +408,7 @@ const styles = StyleSheet.create({
   },
   premiumTag: {
     borderRadius: 999,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 4,
   },
   premiumTagText: {
@@ -543,21 +419,25 @@ const styles = StyleSheet.create({
   },
   cardImageSmall: {
     width: '100%',
-    height: 88,
-    borderRadius: 10,
+    height: 92,
+    borderRadius: 12,
     marginTop: 10,
     marginBottom: 8,
     backgroundColor: '#F1F5F9',
   },
   cardTitleSmall: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: '#1E293B',
     lineHeight: 18,
     minHeight: 36,
   },
-  cardFooterRow: {
+  cardFooterWrap: {
     marginTop: 'auto',
+    width: '100%',
+  },
+  cardFooterRow: {
+    marginTop: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -567,24 +447,19 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontWeight: '700',
   },
-  purchaseWrap: {
-    width: '100%',
-  },
-  priceText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 5,
-  },
-  buyButton: {
+  lockedButton: {
     borderRadius: 8,
-    backgroundColor: '#1D4ED8',
+    backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
     paddingVertical: 7,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
-  buyButtonText: {
-    color: '#FFFFFF',
+  lockedButtonText: {
+    color: '#334155',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.2,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { fetchMyHelpRequests, createHelpRequest } from '../api/help';
@@ -10,6 +10,25 @@ export default function HelpSupportScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [ticketModalVisible, setTicketModalVisible] = useState(false);
+  const [ticketDetailVisible, setTicketDetailVisible] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+
+  const getStatusMeta = (statusValue) => {
+    const normalized = String(statusValue || '').trim().toLowerCase();
+    if (normalized === 'closed') {
+      return {
+        label: 'Closed',
+        bg: '#FEE2E2',
+        text: '#B91C1C',
+      };
+    }
+    return {
+      label: 'Open',
+      bg: '#DCFCE7',
+      text: '#166534',
+    };
+  };
 
   const loadHelpRequests = async () => {
     setLoading(true);
@@ -33,6 +52,7 @@ export default function HelpSupportScreen({ navigation }) {
     try {
       await createHelpRequest(message.trim());
       setMessage('');
+      setTicketModalVisible(false);
       await loadHelpRequests();
     } catch (e) {
       setError('Failed to submit help request');
@@ -43,7 +63,6 @@ export default function HelpSupportScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.root}>
-        {/* Top Navbar */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation && navigation.goBack && navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#1D4ED8" />
@@ -51,28 +70,23 @@ export default function HelpSupportScreen({ navigation }) {
           <Text style={styles.headerTitle}>Help & Support</Text>
           <View style={styles.backBtnPlaceholder} />
         </View>
+
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Submit a New Request</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Describe your issue or question..."
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={3}
-              editable={!submitting}
-            />
+          <View style={styles.actionsWrap}>
             <TouchableOpacity
-              style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
-              onPress={handleAddHelp}
-              disabled={submitting || !message.trim()}
+              style={styles.createTicketBtn}
+              onPress={() => {
+                setError(null);
+                setTicketModalVisible(true);
+              }}
+              activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="send" size={20} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.submitBtnText}>{submitting ? 'Sending...' : 'Send'}</Text>
+              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.createTicketBtnText}>Create New Ticket</Text>
             </TouchableOpacity>
             {error && <Text style={styles.error}>{error}</Text>}
           </View>
+
           <View style={styles.listCard}>
             <Text style={styles.listTitle}>My Requests</Text>
             {loading ? (
@@ -84,19 +98,138 @@ export default function HelpSupportScreen({ navigation }) {
                 data={helpRequests}
                 keyExtractor={item => item._id}
                 contentContainerStyle={{ paddingBottom: 20 }}
-                renderItem={({ item }) => (
-                  <View style={styles.helpItem}>
-                    <MaterialCommunityIcons name="message-question-outline" size={20} color="#1D4ED8" style={{ marginRight: 8 }} />
+                renderItem={({ item }) => {
+                  const statusMeta = getStatusMeta(item?.status);
+                  return (
+                  <TouchableOpacity
+                    style={styles.helpItem}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setSelectedTicket(item);
+                      setTicketDetailVisible(true);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="message-question-outline" size={20} color="#1D4ED8" style={{ marginRight: 8, marginTop: 2 }} />
                     <View style={{ flex: 1 }}>
+                      <View style={styles.itemTopRow}>
+                        <Text style={styles.helpDate}>{new Date(item.createdAt).toLocaleString()}</Text>
+                        <View style={[styles.statusPill, { backgroundColor: statusMeta.bg }]}> 
+                          <Text style={[styles.statusPillText, { color: statusMeta.text }]}>{statusMeta.label}</Text>
+                        </View>
+                      </View>
                       <Text style={styles.helpMessage}>{item.message}</Text>
-                      <Text style={styles.helpDate}>{new Date(item.createdAt).toLocaleString()}</Text>
                     </View>
-                  </View>
-                )}
+                  </TouchableOpacity>
+                )}}
               />
             )}
           </View>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={ticketModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setTicketModalVisible(false)}
+        >
+          <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setTicketModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#1D4ED8" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Create Ticket</Text>
+              <View style={styles.backBtnPlaceholder} />
+            </View>
+
+            <KeyboardAvoidingView style={styles.modalBody} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <Text style={styles.modalTitle}>Write your message</Text>
+              <Text style={styles.modalSubTitle}>Describe your issue in detail and submit.</Text>
+
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Type your message..."
+                placeholderTextColor="#94A3B8"
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                textAlignVertical="top"
+                editable={!submitting}
+              />
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setTicketModalVisible(false)}
+                  disabled={submitting}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+                  onPress={handleAddHelp}
+                  disabled={submitting || !message.trim()}
+                >
+                  <MaterialCommunityIcons name="send" size={18} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.submitBtnText}>{submitting ? 'Sending...' : 'Submit Ticket'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {error && <Text style={styles.error}>{error}</Text>}
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+
+        <Modal
+          visible={ticketDetailVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setTicketDetailVisible(false)}
+        >
+          <View style={styles.detailOverlay}>
+            <View style={styles.detailCard}>
+              <View style={styles.detailHeaderRow}>
+                <Text style={styles.detailTitle}>Ticket Details</Text>
+                <TouchableOpacity onPress={() => setTicketDetailVisible(false)} style={styles.detailCloseBtn}>
+                  <MaterialCommunityIcons name="close" size={20} color="#334155" />
+                </TouchableOpacity>
+              </View>
+
+              {selectedTicket && (
+                <>
+                  <View style={styles.detailStatusRow}>
+                    <Text style={styles.detailLabel}>Status</Text>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        {
+                          backgroundColor: getStatusMeta(selectedTicket.status).bg,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          {
+                            color: getStatusMeta(selectedTicket.status).text,
+                          },
+                        ]}
+                      >
+                        {getStatusMeta(selectedTicket.status).label}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.detailLabel}>Created At</Text>
+                  <Text style={styles.detailValue}>{new Date(selectedTicket.createdAt).toLocaleString()}</Text>
+
+                  <Text style={styles.detailLabel}>Message</Text>
+                  <Text style={styles.detailMessage}>{selectedTicket.message || '-'}</Text>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -138,34 +271,23 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
   },
-  formCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 18,
-    margin: 18,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
+  actionsWrap: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 4,
   },
-  formTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1D4ED8',
-    marginBottom: 10,
+  createTicketBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    minHeight: 44,
   },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 10,
+  createTicketBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
     fontSize: 15,
-    minHeight: 60,
-    marginBottom: 10,
-    color: '#0F172A',
   },
   submitBtn: {
     flexDirection: 'row',
@@ -173,9 +295,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#1D4ED8',
     borderRadius: 8,
-    paddingVertical: 10,
-    marginTop: 2,
-    marginBottom: 2,
+    paddingVertical: 12,
+    minHeight: 46,
+    flex: 1,
   },
   submitBtnText: {
     color: '#fff',
@@ -184,22 +306,15 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#DC2626',
-    fontSize: 15,
+    fontSize: 13,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   listCard: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
     margin: 18,
     marginTop: 8,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 0,
   },
   listTitle: {
     fontSize: 16,
@@ -226,6 +341,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  itemTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   helpMessage: {
     color: '#0F172A',
     fontSize: 15,
@@ -234,5 +355,134 @@ const styles = StyleSheet.create({
   helpDate: {
     color: '#64748B',
     fontSize: 12,
+  },
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  modalBody: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  modalTitle: {
+    color: '#0F172A',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  modalSubTitle: {
+    marginTop: 4,
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalInput: {
+    marginTop: 14,
+    flex: 1,
+    minHeight: 220,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#0F172A',
+    fontSize: 15,
+  },
+  modalActionRow: {
+    marginTop: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    flex: 1,
+    minHeight: 46,
+    marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  detailCard: {
+    width: '100%',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  detailTitle: {
+    color: '#0F172A',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  detailCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  detailStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailLabel: {
+    marginTop: 6,
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  detailValue: {
+    marginTop: 4,
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailMessage: {
+    marginTop: 4,
+    color: '#0F172A',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
   },
 });

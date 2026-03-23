@@ -60,6 +60,22 @@ export default function BattlegroundPrizesScreen({ navigation, route }) {
           )}
         </View>
 
+        <View style={styles.howItWorksCard}>
+          <Text style={styles.howItWorksTitle}>How Streak Works</Text>
+          <View style={styles.ruleRow}>
+            <Text style={styles.ruleBullet}>1.</Text>
+            <Text style={styles.ruleText}>Attempt your daily battleground quiz to continue your streak.</Text>
+          </View>
+          <View style={styles.ruleRow}>
+            <Text style={styles.ruleBullet}>2.</Text>
+            <Text style={styles.ruleText}>Missing a day can break your current streak progress.</Text>
+          </View>
+          <View style={styles.ruleRow}>
+            <Text style={styles.ruleBullet}>3.</Text>
+            <Text style={styles.ruleText}>As streak grows, milestones unlock better rewards in roadmap below.</Text>
+          </View>
+        </View>
+
         <View style={styles.roadmapWrap}>
           <View style={styles.roadLine} />
 
@@ -116,6 +132,39 @@ const styles = StyleSheet.create({
   streakPillLabel: { color: '#94A3B8', fontSize: 13, fontWeight: '700' },
   streakPillValue: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
   heroHint: { color: '#38BDF8', marginTop: 10, fontSize: 13, fontWeight: '700' },
+
+  howItWorksCard: {
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
+  },
+  howItWorksTitle: {
+    color: '#1E3A8A',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  ruleBullet: {
+    width: 18,
+    color: '#1D4ED8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  ruleText: {
+    flex: 1,
+    color: '#1E293B',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
 
   roadmapWrap: {
     marginTop: 20,

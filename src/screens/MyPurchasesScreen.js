@@ -7,11 +7,13 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import apiClient from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import AppHeader from '../components/AppHeader';
 
 function formatPrice(amount) {
   const value = Number(amount || 0);
@@ -75,6 +77,12 @@ export default function MyPurchasesScreen({ navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <AppHeader
+          title="My Purchases"
+          navigation={navigation}
+          showBack={true}
+          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        />
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#1D4ED8" />
           <Text style={styles.helperText}>Loading purchases...</Text>
@@ -86,6 +94,12 @@ export default function MyPurchasesScreen({ navigation }) {
   if (error) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <AppHeader
+          title="My Purchases"
+          navigation={navigation}
+          showBack={true}
+          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        />
         <View style={styles.centerState}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => fetchPurchases(false)}>
@@ -98,15 +112,13 @@ export default function MyPurchasesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <AppHeader
+        title="My Purchases"
+        navigation={navigation}
+        showBack={true}
+        right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+      />
       <View style={styles.root}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>{'<'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>My Purchases</Text>
-          <View style={styles.backBtnPlaceholder} />
-        </View>
-
         <FlatList
           data={purchases}
           keyExtractor={(item, index) => String(item?._id || index)}
@@ -151,29 +163,7 @@ export default function MyPurchasesScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   root: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  backBtnText: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
-  backBtnPlaceholder: { width: 36, height: 36 },
-  title: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
+  headerLogo: { width: 32, height: 32, borderRadius: 8 },
 
   listContent: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 20 },
   receiptCard: {

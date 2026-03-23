@@ -36,7 +36,7 @@ export default function OttCourseDetailScreen({ route, navigation }) {
             )
           );
           if (!purchasedIds.has(String(courseId))) {
-            Alert.alert('Purchase Required', 'Please buy this course from website to access lessons.', [
+            Alert.alert('Purchase Required', 'Please purchase this course to access lessons.', [
               { text: 'OK', onPress: () => navigation.goBack() },
             ]);
             setLoading(false);

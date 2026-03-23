@@ -21,6 +21,7 @@ export default function LoginScreen({ navigation, route }) {
   const [error, setError] = useState('');
   // Show a confirmation after returning from successful registration.
   const justRegistered = route?.params?.registered === true;
+  const resetDone = route?.params?.resetDone === true;
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -65,6 +66,12 @@ export default function LoginScreen({ navigation, route }) {
               Account created! Please log in.
             </Text>
           )}
+
+          {resetDone && (
+            <Text style={styles.successText}>
+              Password updated. Please log in with your new password.
+            </Text>
+          )}
           {!!error && <Text style={styles.errorText}>{error}</Text>}
 
           <Text style={styles.label}>Email</Text>
@@ -100,6 +107,14 @@ export default function LoginScreen({ navigation, route }) {
             ) : (
               <Text style={styles.buttonText}>Login</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.resetLink}
+            onPress={() => navigation.navigate('ResetPassword', { identifier: username.trim() })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.resetLinkText}>Reset Password</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -167,6 +182,8 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  resetLink: { marginTop: 12, alignItems: 'center' },
+  resetLinkText: { color: '#1E3A8A', fontSize: 14, fontWeight: '700' },
   errorText: {
     backgroundColor: '#FEE2E2',
     color: '#B91C1C',
