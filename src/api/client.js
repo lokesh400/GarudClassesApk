@@ -4,9 +4,9 @@ import { Platform } from 'react-native';
 
 const COOKIE_KEY = 'session_cookie';
 
-const API_BASE_URL = 'http://10.36.223.198:5000/api';
+// const API_BASE_URL = 'http://10.36.223.198:5000/api';
 
-// const API_BASE_URL = 'https://testportal.garudclasses.com/api';
+const API_BASE_URL = 'https://testportal.garudclasses.com/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
