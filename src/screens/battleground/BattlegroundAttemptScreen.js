@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../components/AppHeader';
-import apiClient from '../api/client';
+import AppHeader from '../../components/AppHeader';
+import apiClient from '../../api/client';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 

@@ -16,7 +16,7 @@ import {
   requestPasswordResetOtp,
   verifyPasswordResetOtp,
   setNewPasswordWithResetToken,
-} from '../api/auth';
+} from '../../api/auth';
 
 export default function ResetPasswordScreen({ navigation, route }) {
   const initialIdentifier = String(route?.params?.identifier || '').trim();

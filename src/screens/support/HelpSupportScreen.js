@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchMyHelpRequests, createHelpRequest } from '../api/help';
+import { fetchMyHelpRequests, createHelpRequest } from '../../api/help';
 
 export default function HelpSupportScreen({ navigation }) {
   const [message, setMessage] = useState('');

@@ -9,8 +9,8 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '../api/client';
-import { useAuth } from '../auth/AuthContext';
+import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
 
 function makeAnswerKey(sectionId, questionId) {
   return `${String(sectionId)}::${String(questionId)}`;

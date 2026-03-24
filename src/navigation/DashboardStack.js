@@ -1,9 +1,9 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import DashboardScreen from '../screens/DashboardScreen';
-import MyProfileScreen from '../screens/MyProfileScreen';
-import HelpSupportScreen from '../screens/HelpSupportScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+import DashboardScreen from '../screens/dashboard/DashboardScreen';
+import MyProfileScreen from '../screens/profile/MyProfileScreen';
+import HelpSupportScreen from '../screens/support/HelpSupportScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 

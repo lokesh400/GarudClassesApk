@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Garud Classes",
-    "slug": "   Garud Classes",
+    "slug": "garud-classes",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,13 +20,19 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundImage": "./assets/icon.png",
         "monochromeImage": "./assets/icon.png"
-      }
+      },
+      "package": "com.lokesh400.garudclasses"
     },
     "web": {
       "favicon": "./assets/icon.png"
     },
     "plugins": [
       "expo-video"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2aee4bf0-1dfd-425a-b6c0-e9dbc0ba0c7d"
+      }
+    }
   }
 }

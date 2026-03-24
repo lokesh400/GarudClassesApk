@@ -1,8 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import BattlegroundScreen from '../screens/BattlegroundScreen';
-import BattlegroundAttemptScreen from '../screens/BattlegroundAttemptScreen';
-import BattlegroundPrizesScreen from '../screens/BattlegroundPrizesScreen';
+import BattlegroundScreen from '../screens/battleground/BattlegroundScreen';
+import BattlegroundAttemptScreen from '../screens/battleground/BattlegroundAttemptScreen';
+import BattlegroundPrizesScreen from '../screens/battleground/BattlegroundPrizesScreen';
 
 const Stack = createNativeStackNavigator();
 

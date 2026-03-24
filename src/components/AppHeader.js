@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+const APP_LOGO = require('../../assets/icon.png');
 
 export default function AppHeader({
   title,
@@ -36,7 +38,9 @@ export default function AppHeader({
           <MaterialCommunityIcons name="menu" size={26} color="#1D4ED8" />
         </TouchableOpacity>
       ) : (
-        <View style={styles.iconBtn} />
+        <View style={styles.rightSlot}>
+          <Image source={APP_LOGO} style={styles.defaultLogo} resizeMode="cover" />
+        </View>
       )}
     </View>
   );
@@ -64,6 +68,7 @@ const styles = StyleSheet.create({
   },
   leftSlot: { minWidth: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   rightSlot: { minWidth: 36, height: 36, alignItems: 'flex-end', justifyContent: 'center', marginLeft: 8 },
+  defaultLogo: { width: 32, height: 32, borderRadius: 8 },
   titleWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   titleWrapLeft: { alignItems: 'flex-start', paddingLeft: 8 },
   headerTitle: {

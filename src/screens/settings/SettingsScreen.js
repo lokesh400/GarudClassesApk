@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../components/AppHeader';
+import AppHeader from '../../components/AppHeader';
 
 export default function SettingsScreen({ navigation }) {
   const [step, setStep] = useState(1);
@@ -68,7 +68,7 @@ export default function SettingsScreen({ navigation }) {
         title="Settings"
         navigation={navigation}
         showBack={true}
-        right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
       />
 
       <View style={styles.root}>

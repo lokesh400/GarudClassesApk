@@ -51,7 +51,7 @@ export default function AppTabs() {
         component={BatchesStack}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) || 'BatchesList';
-          const hideTabBar = routeName === 'TestAttempt';
+          const hideTabBar = routeName === 'TestAttempt' || routeName === 'AttachmentViewer';
 
           return {
             tabBarLabel: 'Batches',

@@ -3,8 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import apiClient from '../api/client';
-import { fetchTargetExams } from '../api/exams';
+import apiClient from '../../api/client';
+import { fetchTargetExams } from '../../api/exams';
 
 export default function MyProfileScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
@@ -73,7 +73,7 @@ export default function MyProfileScreen({ navigation }) {
         </View>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Image
-            source={require('../../assets/icon.png')}
+            source={require('../../../assets/icon.png')}
             style={styles.avatar}
             resizeMode="contain"
           />

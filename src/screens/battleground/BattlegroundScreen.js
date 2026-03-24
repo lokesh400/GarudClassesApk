@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import AppHeader from '../components/AppHeader';
-import apiClient from '../api/client';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
+import apiClient from '../../api/client';
 
 const streakBadges = [
   { days: 3 },
@@ -90,7 +91,7 @@ export default function BattlegroundScreen({ navigation }) {
               <Text style={styles.helpTopBtnText}>?</Text>
             </TouchableOpacity>
 
-            <Image source={require('../../assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 8 }} />
+            <Image source={require('../../../assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 8 }} />
           </View>
         }
       />

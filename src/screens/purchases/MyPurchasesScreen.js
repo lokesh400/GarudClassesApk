@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import apiClient from '../api/client';
-import { useAuth } from '../auth/AuthContext';
-import AppHeader from '../components/AppHeader';
+import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+import AppHeader from '../../components/AppHeader';
 
 function formatPrice(amount) {
   const value = Number(amount || 0);
@@ -81,7 +81,7 @@ export default function MyPurchasesScreen({ navigation }) {
           title="My Purchases"
           navigation={navigation}
           showBack={true}
-          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+          right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
         />
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#1D4ED8" />
@@ -98,7 +98,7 @@ export default function MyPurchasesScreen({ navigation }) {
           title="My Purchases"
           navigation={navigation}
           showBack={true}
-          right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+          right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
         />
         <View style={styles.centerState}>
           <Text style={styles.errorText}>{error}</Text>
@@ -116,7 +116,7 @@ export default function MyPurchasesScreen({ navigation }) {
         title="My Purchases"
         navigation={navigation}
         showBack={true}
-        right={<Image source={require('../../assets/icon.png')} style={styles.headerLogo} />}
+        right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
       />
       <View style={styles.root}>
         <FlatList

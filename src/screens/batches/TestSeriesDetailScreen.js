@@ -10,9 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../components/AppHeader';
-import { useAuth } from '../auth/AuthContext';
-import apiClient from '../api/client';
+import AppHeader from '../../components/AppHeader';
+import { useAuth } from '../../auth/AuthContext';
+import apiClient from '../../api/client';
 
 export default function TestSeriesDetailScreen({ route, navigation }) {
   const { item } = route.params;

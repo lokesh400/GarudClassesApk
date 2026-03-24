@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../../auth/AuthContext';
 
 const { width } = Dimensions.get('window');
 const ACTION_GAP = 12;
@@ -33,7 +33,7 @@ export default function DashboardScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.brandWrap}>
             <Image
-              source={require('../../assets/icon.png')}
+              source={require('../../../assets/icon.png')}
               style={styles.brandLogo}
               resizeMode="contain"
             />

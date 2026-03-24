@@ -11,35 +11,53 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../auth/AuthContext';
+import apiClient from '../../api/client';
 
-export default function LoginScreen({ navigation, route }) {
-  const { login } = useAuth();
-  const [username, setUsername] = useState('');
+export default function SignupScreen({ navigation }) {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // Show a confirmation after returning from successful registration.
-  const justRegistered = route?.params?.registered === true;
-  const resetDone = route?.params?.resetDone === true;
 
-  const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password');
+  const validate = () => {
+    if (!fullName.trim()) return 'Full name is required';
+    if (!email.trim()) return 'Email is required';
+    // Basic email format check
+    if (!/\S+@\S+\.\S+/.test(email.trim())) return 'Enter a valid email address';
+    if (!password) return 'Password is required';
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (password !== confirmPassword) return 'Passwords do not match';
+    return null;
+  };
+
+  const handleSignup = async () => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setError('');
     setLoading(true);
     try {
-      await login(username.trim(), password);
-      // Navigation is automatic: isAuthenticated flips to true in AuthContext,
-      // RootNavigator in App.js re-renders and shows AppTabs.
+      // Email is used as the passport-local 'username' field.
+      // Adjust the field names below to match your backend's expected body.
+      await apiClient.post('/auth/register', {
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      // On success navigate to Login. Pass a success message so the login
+      // screen can show a confirmation to the user.
+      navigation.navigate('Login', { registered: true });
     } catch (e) {
       const status = e.response?.status;
-      if (status === 401) {
-        setError('Incorrect username or password');
+      if (status === 400) {
+        // Covers: duplicate email (UserExistsError), missing fields, short password
+        const msg = e.response?.data?.message;
+        setError(msg || 'Invalid details. Please check your input.');
       } else {
-        console.log(e);
         setError('Something went wrong. Please try again.');
       }
     } finally {
@@ -59,28 +77,28 @@ export default function LoginScreen({ navigation, route }) {
         >
           <View style={styles.card}>
           <Text style={styles.appName}>Garud Classes</Text>
-          <Text style={styles.subtitle}>Login to your account</Text>
+          <Text style={styles.subtitle}>Create your account</Text>
 
-          {justRegistered && (
-            <Text style={styles.successText}>
-              Account created! Please log in.
-            </Text>
-          )}
-
-          {resetDone && (
-            <Text style={styles.successText}>
-              Password updated. Please log in with your new password.
-            </Text>
-          )}
           {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+          <Text style={styles.label}>Full Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your full name"
+            placeholderTextColor="#999"
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
 
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter your email"
             placeholderTextColor="#999"
-            value={username}
-            onChangeText={setUsername}
+            value={email}
+            onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -89,42 +107,44 @@ export default function LoginScreen({ navigation, route }) {
           <Text style={styles.label}>Password</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter password"
+            placeholder="Min. 8 characters"
             placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
 
+          <Text style={styles.label}>Confirm Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Re-enter your password"
+            placeholderTextColor="#999"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+          />
+
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
+            onPress={handleSignup}
             disabled={loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Login</Text>
+              <Text style={styles.buttonText}>Create Account</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.resetLink}
-            onPress={() => navigation.navigate('ResetPassword', { identifier: username.trim() })}
+            style={styles.loginLink}
+            onPress={() => navigation.navigate('Login')}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetLinkText}>Reset Password</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.signupLink}
-            onPress={() => navigation.navigate('Signup')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.signupLinkText}>
-              Don't have an account?{' '}
-              <Text style={styles.signupLinkBold}>Sign Up</Text>
+            <Text style={styles.loginLinkText}>
+              Already have an account?{' '}
+              <Text style={styles.loginLinkBold}>Login</Text>
             </Text>
           </TouchableOpacity>
           </View>
@@ -178,12 +198,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  resetLink: { marginTop: 12, alignItems: 'center' },
-  resetLinkText: { color: '#1E3A8A', fontSize: 14, fontWeight: '700' },
   errorText: {
     backgroundColor: '#FEE2E2',
     color: '#B91C1C',
@@ -193,16 +211,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     textAlign: 'center',
   },
-  successText: {
-    backgroundColor: '#DCFCE7',
-    color: '#166534',
-    fontSize: 13,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  signupLink: { marginTop: 20, alignItems: 'center' },
-  signupLinkText: { fontSize: 14, color: '#6B7280' },
-  signupLinkBold: { color: '#1E3A8A', fontWeight: '700' },
+  loginLink: { marginTop: 20, alignItems: 'center' },
+  loginLinkText: { fontSize: 14, color: '#6B7280' },
+  loginLinkBold: { color: '#1E3A8A', fontWeight: '700' },
 });

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../components/AppHeader';
-import apiClient from '../api/client';
+import AppHeader from '../../components/AppHeader';
+import apiClient from '../../api/client';
 import { Picker } from '@react-native-picker/picker';
 
 export default function CreateBattlegroundScreen({ navigation }) {

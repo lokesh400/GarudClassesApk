@@ -1,12 +1,13 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import BatchesScreen from '../screens/BatchesScreen';
-import TestSeriesDetailScreen from '../screens/TestSeriesDetailScreen';
-import TestAttemptScreen from '../screens/TestAttemptScreen';
-import TestResultScreen from '../screens/TestResultScreen';
-import DownloadsScreen from '../screens/DownloadsScreen';
-import MyPurchasesScreen from '../screens/MyPurchasesScreen';
-import PurchaseReceiptDetailScreen from '../screens/PurchaseReceiptDetailScreen';
+import BatchesScreen from '../screens/batches/BatchesScreen';
+import TestSeriesDetailScreen from '../screens/batches/TestSeriesDetailScreen';
+import TestAttemptScreen from '../screens/batches/TestAttemptScreen';
+import TestResultScreen from '../screens/batches/TestResultScreen';
+import DownloadsScreen from '../screens/batches/DownloadsScreen';
+import AttachmentViewerScreen from '../screens/batches/AttachmentViewerScreen';
+import MyPurchasesScreen from '../screens/purchases/MyPurchasesScreen';
+import PurchaseReceiptDetailScreen from '../screens/purchases/PurchaseReceiptDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -15,6 +16,7 @@ export default function BatchesStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="BatchesList" component={BatchesScreen} />
       <Stack.Screen name="Downloads" component={DownloadsScreen} />
+      <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />
       <Stack.Screen name="MyPurchases" component={MyPurchasesScreen} />
       <Stack.Screen name="PurchaseReceiptDetail" component={PurchaseReceiptDetailScreen} />
       <Stack.Screen name="TestSeriesDetail" component={TestSeriesDetailScreen} />

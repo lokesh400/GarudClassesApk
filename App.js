@@ -8,13 +8,9 @@ import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import AuthStack from './src/navigation/AuthStack';
 import AppTabs from './src/navigation/AppTabs';
 
-// RootNavigator reads auth state and renders the correct navigator.
-// It MUST live inside AuthProvider to access the context.
 function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // isLoading is only true during the brief AsyncStorage check on launch.
-  // Show a spinner to prevent a flash of the Login screen for returning users.
   if (isLoading) {
     return (
       <View style={styles.splash}>
