@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ScrollView, Dimensions } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/AuthContext';
+import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCourse, getCohorts } from '../../api/client';
 
 const { width } = Dimensions.get('window');
 const ACTION_GAP = 12;
@@ -11,18 +14,111 @@ const ACTION_CARD_WIDTH = (width - 32 - ACTION_GAP) / 2;
 export default function DashboardScreen({ navigation }) {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cohorts, setCohorts] = useState([]);
+  const [selectedCohort, setSelectedCohort] = useState(null);
+  const [schedule, setSchedule] = useState({ live: [], upcoming: [], completed: [] });
+  const [cohortsLoading, setCohortsLoading] = useState(true);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+  // Load cohorts on mount
+  useEffect(() => {
+    (async () => {
+      setCohortsLoading(true);
+      try {
+        const response = await getCohorts();
+        const data = response.data || [];
+        setCohorts(data);
+        if (data.length) {
+          const persisted = await AsyncStorage.getItem('selectedCohort');
+          const matched = data.find(c => c._id === persisted);
+          const initial = matched ? persisted : data[0]._id;
+          setSelectedCohort(initial);
+        }
+      } catch (e) {
+        console.error('Failed to load cohorts', e);
+      } finally {
+        setCohortsLoading(false);
+      }
+    })();
   }, []);
+
+  // Persist cohort selection
+  useEffect(() => {
+    if (selectedCohort) {
+      AsyncStorage.setItem('selectedCohort', selectedCohort);
+    }
+  }, [selectedCohort]);
+
+  // Load schedule whenever cohort changes
+  useEffect(() => {
+    if (!selectedCohort) return;
+    (async () => {
+      setScheduleLoading(true);
+      try {
+        const data = await getCourse(selectedCohort);
+        setSchedule({
+          live: data.live || [],
+          upcoming: data.upcoming || [],
+          completed: data.completed || [],
+        });
+      } catch (e) {
+        console.error('Failed to load schedule', e);
+        setSchedule({ live: [], upcoming: [], completed: [] });
+      } finally {
+        setScheduleLoading(false);
+      }
+    })();
+  }, [selectedCohort]);
 
   const openSoon = (label) => {
     setMenuOpen(false);
     Alert.alert(label, `${label} module will be added with backend integration.`);
   };
+
+  const renderLectureCard = (lecture) => (
+    <View key={lecture._id} style={styles.horizontalLectureCard}>
+      {lecture.status === 'live' && (
+        <View style={styles.livePill}>
+          <View style={styles.liveDot} />
+          <Text style={styles.livePillText}>LIVE NOW</Text>
+        </View>
+      )}
+      <Text style={styles.lectureTitle} numberOfLines={2}>{lecture.title}</Text>
+      <Text style={styles.lectureSubtitle} numberOfLines={1}>{lecture.subject}</Text>
+      {lecture.scheduledAt && (
+        <Text style={styles.lectureTime}>
+          {new Date(lecture.scheduledAt).toLocaleString('en-IN', {
+            day: 'numeric', month: 'short',
+            hour: '2-digit', minute: '2-digit'
+          })}
+        </Text>
+      )}
+      <View style={{ flex: 1 }} />
+      <TouchableOpacity
+        style={[styles.joinBtn, lecture.status === 'live' && styles.joinBtnLive]}
+        onPress={() => {
+          navigation.navigate('Study', {
+            screen: 'StudyYoutubeVideoPlayer',
+            params: {
+              courseId: selectedCohort,
+              lectureId: lecture._id,
+              lectureTitle: lecture.title,
+              status: lecture.status || 'ended',
+            }
+          });
+        }}
+      >
+        <MaterialCommunityIcons
+          name={lecture.status === 'live' ? 'play-circle' : 'play-outline'}
+          size={16}
+          color="#fff"
+        />
+        <Text style={styles.joinBtnText}>
+          {lecture.status === 'live' ? 'Join Live' : 'Watch Recording'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -48,37 +144,104 @@ export default function DashboardScreen({ navigation }) {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroGlowOne} />
-            <View style={styles.heroGlowTwo} />
-
-            <View style={styles.heroTopRow}>
-              <Text style={styles.welcomeGreeting}>{greeting}</Text>
-              <View style={styles.readyPill}>
-                <MaterialCommunityIcons name="flash" size={12} color="#BFDBFE" />
-                <Text style={styles.readyPillText}>Ready</Text>
-              </View>
+                    {/* Cohort Selector */}
+          {cohortsLoading ? (
+            <View style={styles.cohortLoadingWrap}>
+              <ActivityIndicator size="small" color="#1D4ED8" />
+              <Text style={styles.cohortLoadingText}>Loading batches…</Text>
             </View>
-
-            <Text style={styles.welcomeName}>Welcome back, Garud Student</Text>
-            <Text style={styles.welcomeSubtext}>Build momentum today with lectures, practice, and challenges.</Text>
-
-            <View style={styles.heroStatRow}>
-              <View style={styles.heroStatPill}>
-                <MaterialCommunityIcons name="book-open-variant" size={18} color="#DBEAFE" />
-                <Text style={styles.heroStatLabel}>Batches</Text>
-              </View>
-              <View style={styles.heroStatPill}>
-                <MaterialCommunityIcons name="download-circle-outline" size={18} color="#DBEAFE" />
-                <Text style={styles.heroStatLabel}>Downloads</Text>
-              </View>
-              <View style={styles.heroStatPill}>
-                <MaterialCommunityIcons name="sword-cross" size={18} color="#DBEAFE" />
-                <Text style={styles.heroStatLabel}>Battleground</Text>
-              </View>
+          ) : cohorts.length === 0 ? (
+            <View style={styles.noBatchCard}>
+              <MaterialCommunityIcons name="school-outline" size={36} color="#93C5FD" />
+              <Text style={styles.noBatchTitle}>Not enrolled in any batch</Text>
+              <Text style={styles.noBatchSubText}>
+                Ask your admin to enroll you in a batch to see your live classes here.
+              </Text>
             </View>
-          </View>
+          ) : (
+            <>
+              {/* Premium Cohort Picker */}
+              <View style={styles.premiumPickerCard}>
+                <View style={styles.pickerHeader}>
+                  <MaterialCommunityIcons name="google-classroom" size={18} color="#1D4ED8" />
+                  <Text style={styles.pickerLabel}>My Active Batch</Text>
+                </View>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={selectedCohort}
+                    onValueChange={(value) => setSelectedCohort(value)}
+                    style={styles.picker}
+                    dropdownIconColor="#1D4ED8"
+                  >
+                    {cohorts.map((c) => (
+                      <Picker.Item key={c._id} label={c.name ?? 'Unnamed Batch'} value={c._id} color="#0F172A" />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
 
+              {/* Lecture Sections */}
+              {scheduleLoading ? (
+                <ActivityIndicator size="large" color="#1D4ED8" style={{ marginTop: 40, marginBottom: 40 }} />
+              ) : (
+                <>
+                  {/* LIVE CLASSES */}
+                  <View style={styles.horizontalSection}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionTitle}>Live Classes</Text>
+                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.live.length}</Text></View>
+                    </View>
+                    {schedule.live.length === 0 ? (
+                      <View style={styles.emptyHorizontalCard}>
+                         <MaterialCommunityIcons name="broadcast" size={24} color="#93C5FD" />
+                         <Text style={styles.emptyHorizontalText}>No live classes scheduled</Text>
+                      </View>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                        {schedule.live.map(lecture => renderLectureCard(lecture))}
+                      </ScrollView>
+                    )}
+                  </View>
+
+                  {/* UPCOMING CLASSES */}
+                  <View style={styles.horizontalSection}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionTitle}>Upcoming Classes</Text>
+                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.upcoming.length}</Text></View>
+                    </View>
+                    {schedule.upcoming.length === 0 ? (
+                      <View style={styles.emptyHorizontalCard}>
+                         <MaterialCommunityIcons name="calendar-clock" size={24} color="#93C5FD" />
+                         <Text style={styles.emptyHorizontalText}>No upcoming classes scheduled</Text>
+                      </View>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                        {schedule.upcoming.map(lecture => renderLectureCard(lecture))}
+                      </ScrollView>
+                    )}
+                  </View>
+
+                  {/* COMPLETED CLASSES */}
+                  <View style={styles.horizontalSection}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionTitle}>Completed Classes</Text>
+                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.completed.length}</Text></View>
+                    </View>
+                    {schedule.completed.length === 0 ? (
+                      <View style={styles.emptyHorizontalCard}>
+                         <MaterialCommunityIcons name="check-circle-outline" size={24} color="#93C5FD" />
+                         <Text style={styles.emptyHorizontalText}>No completed classes</Text>
+                      </View>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                        {schedule.completed.map(lecture => renderLectureCard(lecture))}
+                      </ScrollView>
+                    )}
+                  </View>
+                </>
+              )}
+            </>
+          )}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <Text style={styles.sectionSubTitle}>Jump right in</Text>
@@ -236,6 +399,167 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  premiumPickerCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pickerLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#64748B',
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+    height: 50,
+    color: '#0F172A',
+  },
+  horizontalSection: {
+    marginTop: 20,
+  },
+  horizontalSectionHeader: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  horizontalSectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  horizontalScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 4,
+  },
+  horizontalLectureCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    width: 240,
+    minHeight: 160,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  emptyHorizontalCard: {
+    marginHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHorizontalText: {
+    marginTop: 8,
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+    marginRight: 4,
+  },
+  livePillText: {
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  lectureTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  lectureSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginVertical: 4,
+  },
+  lectureTime: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  joinBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  joinBtnLive: {
+    backgroundColor: '#EF4444',
+  },
+  joinBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  badgeBox: {
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    marginTop: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  sectionHeaderRow: {
+    marginTop: 0, // Reset to 0 since container handles it
+    marginBottom: 10,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   root: {
     flex: 1,
     backgroundColor: '#F8FAFC',

@@ -2,11 +2,11 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const COOKIE_KEY = 'session_cookie';
+const COOKIE_KEY = 'sid';
 
-// const API_BASE_URL = 'http://10.36.223.198:5000/api';
+const API_BASE_URL = 'http://192.168.31.30:5000/api';
 
-const API_BASE_URL = 'https://testportal.garudclasses.com/api';
+// const API_BASE_URL = 'https://testportal.garudclasses.com/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -54,5 +54,46 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Fetch available cohorts (purchased courses) for the logged‑in student.
+export const getCohorts = async () => {
+  const response = await apiClient.get('/purchase/my?itemType=Course');
+  const purchases = response.data || [];
+  const courses = purchases.map(p => p.course || p.itemId).filter(Boolean);
+  return { data: courses };
+};
+
 export default apiClient;
 export { COOKIE_KEY };
+
+// Fetch live / upcoming / completed schedule for a course.
+export const getCourse = async (courseId) => {
+  const response = await apiClient.get(`/courses/published/${courseId}`);
+  const course = response.data;
+  
+  const allLectures = [];
+  if (Array.isArray(course.subjects)) {
+    course.subjects.forEach(subject => {
+      if (Array.isArray(subject.chapters)) {
+        subject.chapters.forEach(chapter => {
+          if (Array.isArray(chapter.lectures)) {
+            chapter.lectures.forEach(lecture => {
+              allLectures.push({
+                ...lecture,
+                subject: subject.name,
+                chapter: chapter.name
+              });
+            });
+          }
+        });
+      }
+    });
+  } else if (Array.isArray(course.lectures)) {
+    allLectures.push(...course.lectures);
+  }
+
+  return {
+    live: allLectures.filter(l => l.status === 'live'),
+    upcoming: allLectures.filter(l => l.status === 'scheduled'),
+    completed: allLectures.filter(l => l.status === 'ended' || !l.status || l.status === 'completed'),
+  };
+};

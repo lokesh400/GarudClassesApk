@@ -8,32 +8,52 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { useAuth } from '../../auth/AuthContext';
 import apiClient from '../../api/client';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function BatchesScreen({ navigation }) {
   const { logout } = useAuth();
-  const [batches, setBatches] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchBatches = useCallback(
+  const fetchData = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
       setError('');
       try {
-        const response = await apiClient.get('/test-series/my-purchase');
-        setBatches(response.data);
+        const [pubCoursesRes, pubTestsRes, myCoursesRes, myTestsRes] = await Promise.all([
+          apiClient.get('/courses/published?minimal=true'),
+          apiClient.get('/test-series/published'),
+          apiClient.get('/study/my-courses'),
+          apiClient.get('/test-series/my-purchase')
+        ]);
+
+        const purchasedCourseIds = new Set((myCoursesRes.data || []).map(c => c._id));
+        const purchasedTestIds = new Set((myTestsRes.data || []).map(t => t._id));
+
+        const unpurchasedCourses = (pubCoursesRes.data || [])
+          .filter(c => !purchasedCourseIds.has(c._id))
+          .map(c => ({ ...c, _type: 'course' }));
+
+        const unpurchasedTests = (pubTestsRes.data || [])
+          .filter(t => !purchasedTestIds.has(t._id))
+          .map(t => ({ ...t, _type: 'test-series' }));
+
+        setAllItems([...unpurchasedCourses, ...unpurchasedTests]);
       } catch (e) {
         if (e.response?.status === 401) {
           logout();
         } else {
-          console.error('Error fetching batches:', e);
-          setError('Failed to load batches. Please try again.');
+          console.error('Error fetching explore items:', e);
+          setError('Failed to load. Please try again.');
         }
       } finally {
         setLoading(false);
@@ -44,57 +64,80 @@ export default function BatchesScreen({ navigation }) {
   );
 
   useEffect(() => {
-    fetchBatches();
-  }, [fetchBatches]);
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchBatches(true);
+    fetchData(true);
   };
 
-  const totalBatches = batches.length;
+  const filteredItems = allItems.filter(item => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (item.name || '').toLowerCase().includes(q) || (item.description || '').toLowerCase().includes(q);
+  });
 
-  const renderBatch = ({ item }) => (
-    <View style={styles.card}>
-      {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-          <Text style={styles.cardImagePlaceholderText}>No Image</Text>
+  const renderItem = ({ item }) => {
+    const isCourse = item._type === 'course';
+    
+    return (
+      <TouchableOpacity 
+        style={styles.card}
+        activeOpacity={0.85}
+        onPress={() => {
+          if (isCourse) {
+            navigation.navigate('Study', { screen: 'StudyCourseDetail', params: { courseId: item._id, purchased: false } });
+          } else {
+            navigation.navigate('TestSeriesDetail', { item });
+          }
+        }}
+      >
+        <View style={styles.badgeWrap}>
+          <Text style={styles.badgeText}>{isCourse ? 'BATCH' : 'TEST SERIES'}</Text>
         </View>
-      )}
-
-      <View style={styles.cardBody}>
-        <Text style={styles.batchName}>{item.name || 'Batch'}</Text>
-        {!!item.description && (
-          <Text style={styles.batchDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+            <Text style={styles.cardImagePlaceholderText}>No Image</Text>
+          </View>
         )}
 
-        <TouchableOpacity
-          style={styles.studyButton}
-          onPress={() => navigation.navigate('TestSeriesDetail', { item })}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.studyButtonText}>Continue Learning</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+        <View style={styles.cardBody}>
+          <Text style={styles.batchName}>{item.name || 'Untitled'}</Text>
+          {!!item.description && (
+            <Text style={styles.batchDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          )}
+          <View style={styles.priceRow}>
+            {item.price > 0 ? (
+              <Text style={styles.priceText}>₹{item.price}</Text>
+            ) : (
+              <Text style={styles.freeText}>FREE</Text>
+            )}
+            <View style={styles.exploreBtn}>
+              <Text style={styles.exploreBtnText}>Explore</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <AppHeader
-          title="My Batches"
+          title="Explore"
           navigation={navigation}
           showBack={true}
           right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
         />
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#1D4ED8" />
-          <Text style={styles.loadingText}>Loading your batches...</Text>
+          <Text style={styles.loadingText}>Finding best batches for you...</Text>
         </View>
       </SafeAreaView>
     );
@@ -104,14 +147,14 @@ export default function BatchesScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <AppHeader
-          title="My Batches"
+          title="Explore"
           navigation={navigation}
           showBack={true}
           right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
         />
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchBatches()}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -122,27 +165,32 @@ export default function BatchesScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <AppHeader
-        title="My Batches"
+        title="Explore"
         navigation={navigation}
         showBack={true}
         right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
       />
       <View style={styles.root}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>YOUR STUDY TRACKS</Text>
-          <Text style={styles.summaryValue}>{totalBatches}</Text>
-          <Text style={styles.summarySubText}>Batches available to continue</Text>
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#64748B" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search batches & test series..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
 
         <FlatList
-          data={batches}
-          keyExtractor={(item, index) => String(item._id ?? item.id ?? index)}
-          renderItem={renderBatch}
+          data={filteredItems}
+          keyExtractor={(item, index) => String(item._id ?? index)}
+          renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Text style={styles.emptyText}>No batches found.</Text>
+              <Text style={styles.emptyText}>No items found matching your search.</Text>
             </View>
           }
         />
@@ -160,37 +208,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  summaryCard: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 4,
-    borderRadius: 16,
+    borderRadius: 12,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#1D4ED8',
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+  searchIcon: {
+    marginRight: 8,
   },
-  summaryValue: {
-    marginTop: 4,
-    fontSize: 28,
-    color: '#1E3A8A',
-    fontWeight: '900',
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 15,
+    color: '#0F172A',
   },
-  summarySubText: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#334155',
-    fontWeight: '700',
-  },
-  listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 18 },
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 18 },
 
   card: {
     backgroundColor: '#FFFFFF',
@@ -201,28 +245,65 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     elevation: 5,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    position: 'relative',
   },
-  cardImage: { width: '100%', height: 170 },
+  badgeWrap: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 10,
+  },
+  badgeText: {
+    color: '#F8FAFC',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  cardImage: { width: '100%', height: 160 },
   cardImagePlaceholder: {
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardImagePlaceholderText: { color: '#94A3B8', fontSize: 13, fontWeight: '700' },
-  cardBody: { padding: 14 },
-  batchName: { fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 6 },
-  batchDescription: { fontSize: 13, color: '#64748B', lineHeight: 19, marginBottom: 12 },
-
-  studyButton: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: 10,
-    paddingVertical: 11,
+  cardBody: { padding: 16 },
+  batchName: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 6 },
+  batchDescription: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 14 },
+  
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 4,
   },
-  studyButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  priceText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  freeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  exploreBtn: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  exploreBtnText: {
+    color: '#1D4ED8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 
   loadingText: { marginTop: 12, fontSize: 14, color: '#6B7280' },
   errorText: { fontSize: 15, color: '#B91C1C', textAlign: 'center', marginBottom: 16 },
@@ -233,5 +314,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   retryText: { color: '#FFFFFF', fontWeight: '700' },
-  emptyText: { fontSize: 15, color: '#94A3B8', fontWeight: '700' },
+  emptyText: { fontSize: 14, color: '#64748B', fontWeight: '500', textAlign: 'center' },
 });

@@ -484,9 +484,7 @@ export default function TestAttemptScreen({ route, navigation }) {
     if (!width || !height) return;
     const ratio = width / height;
     if (Number.isFinite(ratio) && ratio > 0) {
-      // Clamp extreme ratios so image never stretches beyond card bounds.
-      const clampedRatio = Math.max(0.55, Math.min(ratio, 2.4));
-      setImageAspectRatio(clampedRatio);
+      setImageAspectRatio(ratio);
     }
   };
 
@@ -531,7 +529,7 @@ export default function TestAttemptScreen({ route, navigation }) {
       <View style={styles.root}>
      <View>
       <View style={styles.paletteCardTop}>
-        <View style={styles.paletteGrid}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.paletteGrid}>
           {(currentSection.questions || []).map((entry, qIndex) => {
             const qId = String(entry?.question?._id || '');
             if (!qId) return null;
@@ -553,7 +551,7 @@ export default function TestAttemptScreen({ route, navigation }) {
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
 
         <ScrollView
@@ -764,11 +762,11 @@ function Legend({ label, color, value }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#E9EDF2' },
-  root: { flex: 1, backgroundColor: '#E9EDF2' },
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
   centerState: {
     flex: 1,
-    backgroundColor: '#E9EDF2',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -921,15 +919,9 @@ const styles = StyleSheet.create({
   },
   questionImageFrame: {
     width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
     marginBottom: 10,
-    minHeight: 180,
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   questionImage: {
     width: '100%',
@@ -1046,7 +1038,6 @@ const styles = StyleSheet.create({
   },
   paletteGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
   paletteBtn: {

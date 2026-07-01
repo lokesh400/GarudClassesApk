@@ -22,23 +22,17 @@ const COURSE_COLORS = [
   { shell: '#FFF1F2', edge: '#FECDD3', tag: '#E11D48' },
 ];
 
-export default function OttHomeScreen({ navigation }) {
+export default function StudyHomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [myCourses, setMyCourses] = useState([]);
-  const [exploreCourses, setExploreCourses] = useState([]);
   const [myVisibleCount, setMyVisibleCount] = useState(4);
-  const [exploreVisibleCount, setExploreVisibleCount] = useState(4);
   const [failedImageByCourseId, setFailedImageByCourseId] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     try {
-      const [myRes, exploreRes] = await Promise.all([
-        apiClient.get('/ott/my-courses'),
-        apiClient.get('/ott/explore-courses'),
-      ]);
-      // Map course data and attach display tokens used by the premium card theme.
+      const myRes = await apiClient.get('/study/my-courses');
       const myCoursesMapped = myRes.data.map((purchase, idx) => ({
         ...purchase.course,
         purchaseId: purchase.purchaseId,
@@ -48,12 +42,7 @@ export default function OttHomeScreen({ navigation }) {
         status: purchase.status,
         palette: COURSE_COLORS[idx % COURSE_COLORS.length],
       }));
-      const exploreCoursesMapped = exploreRes.data.map((course, idx) => ({
-        ...course,
-        palette: COURSE_COLORS[idx % COURSE_COLORS.length],
-      }));
       setMyCourses(myCoursesMapped);
-      setExploreCourses(exploreCoursesMapped);
     } catch (err) {
       Alert.alert('Error', 'Failed to load courses.');
     } finally {
@@ -74,7 +63,6 @@ export default function OttHomeScreen({ navigation }) {
 
   useEffect(() => {
     setMyVisibleCount(4);
-    setExploreVisibleCount(4);
   }, [normalizedQuery]);
 
   const myFilteredCourses = useMemo(() => {
@@ -84,21 +72,9 @@ export default function OttHomeScreen({ navigation }) {
     );
   }, [myCourses, normalizedQuery]);
 
-  const exploreFilteredCourses = useMemo(() => {
-    if (!normalizedQuery) return exploreCourses;
-    return exploreCourses.filter((course) =>
-      String(course?.name || '').toLowerCase().includes(normalizedQuery)
-    );
-  }, [exploreCourses, normalizedQuery]);
-
   const myVisibleCourses = useMemo(
     () => myFilteredCourses.slice(0, myVisibleCount),
     [myFilteredCourses, myVisibleCount]
-  );
-
-  const exploreVisibleCourses = useMemo(
-    () => exploreFilteredCourses.slice(0, exploreVisibleCount),
-    [exploreFilteredCourses, exploreVisibleCount]
   );
 
   const resolveCourseImageUri = (course) => {
@@ -123,16 +99,11 @@ export default function OttHomeScreen({ navigation }) {
     return `${origin}/${raw}`;
   };
 
-  const handleOpenCourse = (course, purchased) => {
+  const handleOpenCourse = (course) => {
     const courseId = String(course?._id || course?.id || '');
     if (!courseId) return;
 
-    if (!purchased) {
-      Alert.alert('Locked', 'This course is locked');
-      return;
-    }
-
-    navigation.navigate('OttCourseDetail', { courseId, purchased: true });
+    navigation.navigate('StudyCourseDetail', { courseId, purchased: true });
   };
 
   const onCourseImageError = (courseId) => {
@@ -144,7 +115,6 @@ export default function OttHomeScreen({ navigation }) {
 
   const renderCard = (item, index, sectionKey) => {
     const courseId = String(item?._id || item?.id || '');
-    const isPurchased = purchasedCourseIds.has(courseId);
     const lessonCount =
       Array.isArray(item?.lectures) ? item.lectures.length :
       Array.isArray(item?.videolist) ? item.videolist.length :
@@ -168,13 +138,13 @@ export default function OttHomeScreen({ navigation }) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.cardTouchable}
-          onPress={() => handleOpenCourse(item, isPurchased)}
+          onPress={() => handleOpenCourse(item)}
         >
           <View style={styles.cardBadgeRow}>
             <View style={[styles.premiumTag, { backgroundColor: item.palette?.tag || '#1D4ED8' }]}>
-              <Text style={styles.premiumTagText}>{isPurchased ? 'MY COURSE' : 'EXPLORE'}</Text>
+              <Text style={styles.premiumTagText}>MY COURSE</Text>
             </View>
-            <MaterialCommunityIcons name={isPurchased ? 'play-circle' : 'lock-outline'} size={20} color="#0F172A" />
+            <MaterialCommunityIcons name={'play-circle'} size={20} color="#0F172A" />
           </View>
 
           <Image
@@ -187,29 +157,22 @@ export default function OttHomeScreen({ navigation }) {
           <Text style={styles.cardTitleSmall} numberOfLines={2}>{item.name || 'Course'}</Text>
 
           <View style={styles.cardFooterWrap}>
-            {isPurchased ? (
-              <View style={styles.cardFooterRow}>
-                <Text style={styles.footerLabel}>{lessonCount} lessons</Text>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#334155" />
-              </View>
-            ) : (
-              <View style={styles.lockedButton}>
-                <MaterialCommunityIcons name="lock" size={14} color="#334155" />
-                <Text style={styles.lockedButtonText}>This course is locked</Text>
-              </View>
-            )}
+            <View style={styles.cardFooterRow}>
+              <Text style={styles.footerLabel}>{lessonCount} lessons</Text>
+              <MaterialCommunityIcons name="chevron-right" size={18} color="#334155" />
+            </View>
           </View>
         </TouchableOpacity>
       </View>
     );
   };
 
-  const hasAnyFilteredResults = myFilteredCourses.length > 0 || exploreFilteredCourses.length > 0;
+  const hasAnyFilteredResults = myFilteredCourses.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <AppHeader
-        title="GC OTT"
+        title="Study"
         navigation={navigation}
         showBack={true}
         right={
@@ -231,7 +194,7 @@ export default function OttHomeScreen({ navigation }) {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search courses..."
+                placeholder="Search my courses..."
                 placeholderTextColor="#94A3B8"
                 style={styles.searchInput}
                 returnKeyType="search"
@@ -271,32 +234,6 @@ export default function OttHomeScreen({ navigation }) {
                 <TouchableOpacity
                   style={styles.showMoreButton}
                   onPress={() => setMyVisibleCount((prev) => prev + 4)}
-                >
-                  <Text style={styles.showMoreText}>Show More</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-
-          <View style={styles.sectionHeadRow}>
-            <Text style={styles.heading}>Explore Courses</Text>
-            <Text style={styles.sectionHint}>Find your next track</Text>
-          </View>
-
-          {exploreFilteredCourses.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {normalizedQuery ? 'No explore course matches your search.' : 'No explore courses available right now.'}
-            </Text>
-          ) : (
-            <>
-              <View style={styles.gridWrap}>
-                {exploreVisibleCourses.map((item, index) => renderCard(item, index, 'explore'))}
-              </View>
-
-              {exploreVisibleCount < exploreFilteredCourses.length && (
-                <TouchableOpacity
-                  style={styles.showMoreButton}
-                  onPress={() => setExploreVisibleCount((prev) => prev + 4)}
                 >
                   <Text style={styles.showMoreText}>Show More</Text>
                 </TouchableOpacity>
@@ -446,23 +383,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#334155',
     fontWeight: '700',
-  },
-  lockedButton: {
-    borderRadius: 8,
-    backgroundColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    paddingVertical: 7,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  lockedButtonText: {
-    color: '#334155',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.2,
   },
   showMoreButton: {
     alignSelf: 'center',

@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
 import apiClient from '../../api/client';
 
-export default function OttVideoPlayerScreen({ route, navigation }) {
+export default function StudyVideoPlayerScreen({ route, navigation }) {
   const { courseId, videoId, videoname, videoUrl: directVideoUrl } = route.params || {};
   const isMountedRef = useRef(true);
   const hideControlsTimerRef = useRef(null);

@@ -4,8 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 import BatchesStack from './BatchesStack';
+import MyTestsStack from './MyTestsStack';
 import DashboardStack from './DashboardStack';
-import OttTabs from './OttTabs';
+import StudyTabs from './StudyTabs';
 import BattlegroundStack from './BattlegroundStack';
 
 const Tab = createBottomTabNavigator();
@@ -67,13 +68,15 @@ export default function AppTabs() {
         }}
       />
       <Tab.Screen
-        name="OTT"
-        component={OttTabs}
+        name="Study"
+        component={StudyTabs}
         options={{
-          tabBarLabel: 'OTT',
+          tabBarLabel: 'Study',
           tabBarIcon: ({ color, size, focused }) => (
-            <MaterialCommunityIcons name={focused ? 'play-box' : 'play-box-outline'} size={28} color={color} />
+            <MaterialCommunityIcons name={focused ? 'school' : 'school-outline'} size={28} color={color} />
           ),
+          unmountOnBlur: true,
+          popToTopOnBlur: true,
           tabBarStyle: { ...baseTabBarStyle, display: 'none' },
         }}
       />
@@ -89,6 +92,26 @@ export default function AppTabs() {
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'sword-cross' : 'sword'} size={28} color={color} />
             ),
+            tabBarStyle: hideTabBar
+              ? { ...baseTabBarStyle, display: 'none' }
+              : baseTabBarStyle,
+          };
+        }}
+      />
+      <Tab.Screen
+        name="MyTests"
+        component={MyTestsStack}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) || 'MyTestsList';
+          const hideTabBar = routeName === 'TestAttempt' || routeName === 'AttachmentViewer';
+
+          return {
+            tabBarLabel: 'My Tests',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'clipboard-text' : 'clipboard-text-outline'} size={28} color={color} />
+            ),
+            popToTopOnBlur: true,
+            unmountOnBlur: true,
             tabBarStyle: hideTabBar
               ? { ...baseTabBarStyle, display: 'none' }
               : baseTabBarStyle,

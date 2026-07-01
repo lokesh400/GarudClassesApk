@@ -14,8 +14,18 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         const cookie = await AsyncStorage.getItem(COOKIE_KEY);
-        setIsAuthenticated(!!cookie);
+        if (!cookie) {
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          return;
+        }
+
+        // Validate session via backend route
+        await apiClient.get('/auth/me');
+        setIsAuthenticated(true);
       } catch (e) {
+        console.error('Session validation failed:', e?.response?.status || e.message);
+        await AsyncStorage.removeItem(COOKIE_KEY);
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);

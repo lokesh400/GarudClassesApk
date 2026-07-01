@@ -205,19 +205,21 @@ export default function TestSeriesDetailScreen({ route, navigation }) {
                       </View>
 
                       <View style={styles.testActions}>
-                        <TouchableOpacity
-                          style={[styles.startBtn, running && styles.startBtnDisabled]}
-                          onPress={() => startTest(test)}
-                          disabled={running}
-                        >
-                          {running ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                          ) : (
-                            <Text style={styles.startBtnText}>{primaryLabel}</Text>
-                          )}
-                        </TouchableOpacity>
+                        {(!test.attempted || test.mode !== 'real') && (
+                          <TouchableOpacity
+                            style={[styles.startBtn, running && styles.startBtnDisabled]}
+                            onPress={() => startTest(test)}
+                            disabled={running}
+                          >
+                            {running ? (
+                              <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                              <Text style={styles.startBtnText}>{test.attempted ? 'Retry' : 'Start'}</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
 
-                        {canViewResult && (
+                        {test.attempted && (
                           <TouchableOpacity
                             style={styles.resultBtn}
                             onPress={() => navigation.navigate('TestResult', { testId: test._id })}
