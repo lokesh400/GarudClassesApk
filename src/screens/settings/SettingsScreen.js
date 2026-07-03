@@ -149,5 +149,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   secondaryBtnText: { color: '#334155', fontSize: 13, fontWeight: '800' },
-  rowBtns: { flexDirection: 'row', alignItems: 'center' },
+  rowBtns: { flexDirection: 'row', alignItems: 'center' }
 });
