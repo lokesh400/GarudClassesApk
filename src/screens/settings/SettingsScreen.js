@@ -78,6 +78,7 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    
       <AppHeader
         title="Settings"
         navigation={navigation}
@@ -85,78 +86,6 @@ export default function SettingsScreen({ navigation }) {
         right={<Image source={require('../../../assets/icon.png')} style={styles.headerLogo} />}
       />
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        <View style={styles.card}>
-          <Text style={styles.title}>Change Password</Text>
-          <Text style={styles.stepTitle}>{stepTitle}</Text>
-
-          {step === 1 && (
-            <>
-              <Text style={styles.label}>Username or Email</Text>
-              <TextInput
-                value={identifier}
-                onChangeText={setIdentifier}
-                placeholder="Enter username or email"
-                placeholderTextColor="#94A3B8"
-                autoCapitalize="none"
-                style={styles.input}
-              />
-              <TouchableOpacity style={styles.primaryBtn} onPress={sendOtp}>
-                <Text style={styles.primaryBtnText}>Send OTP</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <Text style={styles.label}>Enter OTP</Text>
-              <TextInput
-                value={otpInput}
-                onChangeText={setOtpInput}
-                placeholder="6-digit OTP"
-                placeholderTextColor="#94A3B8"
-                keyboardType="number-pad"
-                maxLength={6}
-                style={styles.input}
-              />
-              <View style={styles.rowBtns}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(1)}>
-                  <Text style={styles.secondaryBtnText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtnHalf} onPress={verifyOtp}>
-                  <Text style={styles.primaryBtnText}>Verify OTP</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
-              <Text style={styles.label}>New Password</Text>
-              <TextInput
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="Enter new password"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry
-                style={styles.input}
-              />
-              <View style={styles.rowBtns}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(2)}>
-                  <Text style={styles.secondaryBtnText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtnHalf} onPress={updatePassword}>
-                  <Text style={styles.primaryBtnText}>Update Password</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </ScrollView>
     </SafeAreaView>
   );
 }
