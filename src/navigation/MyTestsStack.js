@@ -4,6 +4,7 @@ import MyTestsScreen from '../screens/batches/MyTestsScreen';
 import TestSeriesDetailScreen from '../screens/batches/TestSeriesDetailScreen';
 import TestAttemptScreen from '../screens/batches/TestAttemptScreen';
 import TestResultScreen from '../screens/batches/TestResultScreen';
+import AttemptedTestsScreen from '../screens/batches/AttemptedTestsScreen';
 import DownloadsScreen from '../screens/batches/DownloadsScreen';
 import AttachmentViewerScreen from '../screens/batches/AttachmentViewerScreen';
 import MyPurchasesScreen from '../screens/purchases/MyPurchasesScreen';
@@ -22,6 +23,7 @@ export default function MyTestsStack() {
       <Stack.Screen name="TestSeriesDetail" component={TestSeriesDetailScreen} />
       <Stack.Screen name="TestAttempt" component={TestAttemptScreen} />
       <Stack.Screen name="TestResult" component={TestResultScreen} />
+      <Stack.Screen name="AttemptedTests" component={AttemptedTestsScreen} />
     </Stack.Navigator>
   );
 }

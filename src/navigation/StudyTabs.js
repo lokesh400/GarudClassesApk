@@ -4,7 +4,6 @@ import StudyHomeScreen from '../screens/study/StudyHomeScreen';
 import StudyCourseDetailScreen from '../screens/study/StudyCourseDetailScreen';
 import StudySubjectDetailScreen from '../screens/study/StudySubjectDetailScreen';
 import StudyChapterDetailScreen from '../screens/study/StudyChapterDetailScreen';
-import StudyVideoPlayerScreen from '../screens/study/StudyVideoPlayerScreen';
 import StudyYoutubeVideoPlayerScreen from '../screens/study/StudyYoutubeVideoPlayerScreen';
 import AttachmentViewerScreen from '../screens/batches/AttachmentViewerScreen';
 import DownloadsScreen from '../screens/batches/DownloadsScreen';
@@ -20,7 +19,6 @@ export default function StudyTabs() {
       <Stack.Screen name="StudyCourseDetail" component={StudyCourseDetailScreen} />
       <Stack.Screen name="StudySubjectDetail" component={StudySubjectDetailScreen} />
       <Stack.Screen name="StudyChapterDetail" component={StudyChapterDetailScreen} />
-      <Stack.Screen name="StudyVideoPlayer" component={StudyVideoPlayerScreen} />
       <Stack.Screen name="StudyYoutubeVideoPlayer" component={StudyYoutubeVideoPlayerScreen} />
       <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />
       <Stack.Screen name="Downloads" component={DownloadsScreen} />

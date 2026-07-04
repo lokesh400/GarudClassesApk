@@ -1,434 +1,1568 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../../auth/AuthContext';
-import { Picker } from '@react-native-picker/picker';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  Dimensions,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
+} from 'react-native';
+
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+
+import {
+  MaterialCommunityIcons,
+} from '@expo/vector-icons';
+
+import {
+  useAuth,
+} from '../../auth/AuthContext';
+
+import {
+  Picker,
+} from '@react-native-picker/picker';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCourse, getCohorts } from '../../api/client';
 
-const { width } = Dimensions.get('window');
-const ACTION_GAP = 12;
-const ACTION_CARD_WIDTH = (width - 32 - ACTION_GAP) / 2;
+import {
+  getCourse,
+  getCohorts,
+} from '../../api/client';
 
-export default function DashboardScreen({ navigation }) {
-  const { logout } = useAuth();
+import apiClient from '../../api/client';
+
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+
+import {
+  Platform,
+} from 'react-native';
+
+
+const {
+  width,
+} = Dimensions.get('window');
+
+
+const PURPLE = '#6D28D9';
+const PURPLE_DARK = '#4C1D95';
+const PURPLE_DEEP = '#2E1065';
+
+const TEXT = '#111827';
+const TEXT_SECONDARY = '#475569';
+const MUTED = '#64748B';
+const LIGHT_MUTED = '#94A3B8';
+
+const BACKGROUND = '#F8F7FC';
+const WHITE = '#FFFFFF';
+const BORDER = '#ECE9F3';
+
+
+const QUICK_ACTIONS = [
+  {
+    label: 'Live Classes',
+    icon: 'video-outline',
+    color: '#7C3AED',
+    background: '#F3E8FF',
+  },
+  {
+    label: 'Study',
+    icon: 'school-outline',
+    color: '#2563EB',
+    background: '#EFF6FF',
+  },
+  {
+    label: 'All Batches',
+    icon: 'account-group-outline',
+    color: '#EA580C',
+    background: '#FFF7ED',
+  },
+  {
+    label: 'Test Series',
+    icon: 'clipboard-text-outline',
+    color: '#059669',
+    background: '#ECFDF5',
+  },
+  {
+    label: 'Results',
+    icon: 'chart-box-outline',
+    color: '#DB2777',
+    background: '#FDF2F8',
+  },
+  {
+    label: 'Downloads',
+    icon: 'download-outline',
+    color: '#2563EB',
+    background: '#EFF6FF',
+  },
+  {
+    label: 'Announcements',
+    icon: 'bullhorn-outline',
+    color: '#D97706',
+    background: '#FFFBEB',
+  },
+];
+
+
+export default function DashboardScreen({
+  navigation,
+}) {
+  const {
+    logout,
+  } = useAuth();
+
+
+  const scrollRef = useRef(null);
+
+  const scheduleSectionY = useRef(0);
+
+
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [cohorts, setCohorts] = useState([]);
-  const [selectedCohort, setSelectedCohort] = useState(null);
-  const [schedule, setSchedule] = useState({ live: [], upcoming: [], completed: [], cancelled: [] });
-  const [cohortsLoading, setCohortsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadCohorts();
-    setRefreshing(false);
-  };
-  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [
+    selectedCohort,
+    setSelectedCohort,
+  ] = useState(null);
 
-  // Load cohorts on mount
-  useEffect(() => {
-    (async () => {
-      setCohortsLoading(true);
-      try {
-        const response = await getCohorts();
-        const data = response.data || [];
-        setCohorts(data);
-        if (data.length) {
-          const persisted = await AsyncStorage.getItem('selectedCohort');
-          const matched = data.find(c => c._id === persisted);
-          const initial = matched ? persisted : data[0]._id;
-          setSelectedCohort(initial);
-        }
-      } catch (e) {
-        console.error('Failed to load cohorts', e);
-      } finally {
-        setCohortsLoading(false);
-      }
-    })();
+
+  const [schedule, setSchedule] = useState({
+    live: [],
+    upcoming: [],
+    completed: [],
+    cancelled: [],
+  });
+
+
+  const [
+    cohortsLoading,
+    setCohortsLoading,
+  ] = useState(true);
+
+
+  const [
+    scheduleLoading,
+    setScheduleLoading,
+  ] = useState(false);
+
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+
+  const [
+    hasNewAnnouncement,
+    setHasNewAnnouncement,
+  ] = useState(false);
+
+
+  // ============================================================
+  // DATE
+  // ============================================================
+
+  const isToday = useCallback((dateString) => {
+    if (!dateString) {
+      return false;
+    }
+
+    const date = new Date(dateString);
+
+    const today = new Date();
+
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
   }, []);
 
-  // Persist cohort selection
-  useEffect(() => {
-    if (selectedCohort) {
-      AsyncStorage.setItem('selectedCohort', selectedCohort);
+
+  // ============================================================
+  // COHORTS
+  // ============================================================
+
+  const loadCohorts = useCallback(async () => {
+    setCohortsLoading(true);
+
+    try {
+      const response = await getCohorts();
+
+      const data = Array.isArray(response?.data)
+        ? response.data
+        : [];
+
+      setCohorts(data);
+
+
+      if (data.length > 0) {
+        const persisted =
+          await AsyncStorage.getItem(
+            'selectedCohort'
+          );
+
+
+        const matched = data.find(
+          cohort =>
+            String(cohort?._id) ===
+            String(persisted)
+        );
+
+
+        setSelectedCohort(
+          matched
+            ? matched._id
+            : data[0]._id
+        );
+      } else {
+        setSelectedCohort(null);
+      }
+
+    } catch (error) {
+      console.error(
+        'Failed to load cohorts:',
+        error
+      );
+
+      setCohorts([]);
+
+    } finally {
+      setCohortsLoading(false);
     }
+  }, []);
+
+
+  // ============================================================
+  // PUSH NOTIFICATIONS
+  // ============================================================
+
+  const registerForPushNotificationsAsync =
+    useCallback(async () => {
+      if (
+        Platform.OS === 'web' ||
+        !Device.isDevice
+      ) {
+        return;
+      }
+
+
+      try {
+        const {
+          status: existingStatus,
+        } =
+          await Notifications.getPermissionsAsync();
+
+
+        let finalStatus = existingStatus;
+
+
+        if (existingStatus !== 'granted') {
+          const {
+            status,
+          } =
+            await Notifications.requestPermissionsAsync();
+
+          finalStatus = status;
+        }
+
+
+        if (finalStatus !== 'granted') {
+          return;
+        }
+
+
+        const tokenData =
+          await Notifications.getExpoPushTokenAsync();
+
+
+        if (tokenData?.data) {
+          await apiClient.post(
+            '/auth/push-token',
+            {
+              token: tokenData.data,
+            }
+          );
+        }
+
+      } catch (error) {
+        console.log(
+          'Push notification registration error:',
+          error
+        );
+      }
+    }, []);
+
+
+  useEffect(() => {
+    loadCohorts();
+
+    registerForPushNotificationsAsync();
+  }, [
+    loadCohorts,
+    registerForPushNotificationsAsync,
+  ]);
+
+
+  // ============================================================
+  // SAVE COHORT
+  // ============================================================
+
+  useEffect(() => {
+    if (!selectedCohort) {
+      return;
+    }
+
+
+    AsyncStorage.setItem(
+      'selectedCohort',
+      String(selectedCohort)
+    ).catch(error => {
+      console.log(
+        'Failed to save cohort:',
+        error
+      );
+    });
   }, [selectedCohort]);
 
-  // Load schedule whenever cohort changes
-  useEffect(() => {
-    if (!selectedCohort) return;
-    (async () => {
-      setScheduleLoading(true);
+
+  // ============================================================
+  // ANNOUNCEMENTS
+  // ============================================================
+
+  const loadAnnouncements =
+    useCallback(async () => {
+      if (!selectedCohort) {
+        setHasNewAnnouncement(false);
+
+        return;
+      }
+
+
       try {
-        const data = await getCourse(selectedCohort);
+        const response = await apiClient.get(
+          `/student/announcements?batchId=${selectedCohort}`
+        );
+
+
+        const data = Array.isArray(response?.data)
+          ? response.data
+          : [];
+
+
+        if (data.length === 0) {
+          setHasNewAnnouncement(false);
+
+          return;
+        }
+
+
+        const lastSeen =
+          await AsyncStorage.getItem(
+            `lastSeenAnnouncement_${selectedCohort}`
+          );
+
+
+        const lastDate = lastSeen
+          ? new Date(lastSeen)
+          : new Date(0);
+
+
+        const sortedAnnouncements = [
+          ...data,
+        ].sort(
+          (a, b) =>
+            new Date(b?.createdAt || 0) -
+            new Date(a?.createdAt || 0)
+        );
+
+
+        const latestDate = new Date(
+          sortedAnnouncements[0]?.createdAt || 0
+        );
+
+
+        setHasNewAnnouncement(
+          latestDate > lastDate
+        );
+
+      } catch (error) {
+        console.log(
+          'Announcement loading error:',
+          error
+        );
+      }
+    }, [selectedCohort]);
+
+
+  // ============================================================
+  // SCHEDULE
+  // ============================================================
+
+  const loadSchedule =
+    useCallback(async () => {
+      if (!selectedCohort) {
         setSchedule({
-          live: data.live || [],
-          upcoming: data.upcoming || [],
-          completed: data.completed || [],
-          cancelled: data.cancelled || [],
+          live: [],
+          upcoming: [],
+          completed: [],
+          cancelled: [],
         });
-      } catch (e) {
-        console.error('Failed to load schedule', e);
-        setSchedule({ live: [], upcoming: [], completed: [], cancelled: [] });
+
+        return;
+      }
+
+
+      setScheduleLoading(true);
+
+
+      try {
+        const data = await getCourse(
+          selectedCohort
+        );
+
+
+        setSchedule({
+          live: (
+            data?.live || []
+          ).filter(item =>
+            isToday(item?.scheduledAt)
+          ),
+
+          upcoming: (
+            data?.upcoming || []
+          ).filter(item =>
+            isToday(item?.scheduledAt)
+          ),
+
+          completed: (
+            data?.completed || []
+          ).filter(item =>
+            isToday(item?.scheduledAt)
+          ),
+
+          cancelled: (
+            data?.cancelled || []
+          ).filter(item =>
+            isToday(item?.scheduledAt)
+          ),
+        });
+
+      } catch (error) {
+        console.error(
+          'Failed to load schedule:',
+          error
+        );
+
+
+        setSchedule({
+          live: [],
+          upcoming: [],
+          completed: [],
+          cancelled: [],
+        });
+
       } finally {
         setScheduleLoading(false);
       }
-    })();
-  }, [selectedCohort]);
+    }, [
+      selectedCohort,
+      isToday,
+    ]);
 
-  const openSoon = (label) => {
-    setMenuOpen(false);
-    Alert.alert(label, `${label} module will be added with backend integration.`);
+
+  useEffect(() => {
+    loadSchedule();
+
+    loadAnnouncements();
+  }, [
+    loadSchedule,
+    loadAnnouncements,
+  ]);
+
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+
+    try {
+      await loadCohorts();
+
+      if (selectedCohort) {
+        await Promise.all([
+          loadSchedule(),
+          loadAnnouncements(),
+        ]);
+      }
+
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  const renderLectureCard = (lecture) => (
-    <View key={lecture._id} style={styles.horizontalLectureCard}>
-      {lecture.status === 'live' ? (
-        <View style={styles.livePill}>
-          <View style={styles.liveDot} />
-          <Text style={styles.livePillText}>LIVE NOW</Text>
-        </View>
-      ) : lecture.status === 'cancelled' ? (
-        <View style={[styles.livePill, { backgroundColor: '#F1F5F9' }]}>
-          <Text style={[styles.livePillText, { color: '#64748B' }]}>CANCELLED</Text>
-        </View>
-      ) : null}
-      <Text style={styles.lectureTitle} numberOfLines={2}>{lecture.title}</Text>
-      <Text style={styles.lectureSubtitle} numberOfLines={1}>{lecture.subject}</Text>
-      {lecture.scheduledAt && (
-        <Text style={styles.lectureTime}>
-          {new Date(lecture.scheduledAt).toLocaleString('en-IN', {
-            day: 'numeric', month: 'short',
-            hour: '2-digit', minute: '2-digit'
-          })}
-        </Text>
-      )}
-      <View style={{ flex: 1 }} />
-      {lecture.status === 'cancelled' ? (
-        <View style={[styles.joinBtn, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}>
-           <Text style={[styles.joinBtnText, { color: '#64748B' }]}>🚫 Class Cancelled</Text>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={[styles.joinBtn, lecture.status === 'live' && styles.joinBtnLive]}
-          onPress={() => {
-            navigation.navigate('Study', {
-              screen: 'StudyYoutubeVideoPlayer',
-              params: {
-                courseId: selectedCohort,
-                lectureId: lecture._id,
-                lectureTitle: lecture.title,
-                status: lecture.status || 'ended',
-              }
-            });
-          }}
-        >
-          <MaterialCommunityIcons
-            name={lecture.status === 'live' ? 'play-circle' : 'play-outline'}
-            size={16}
-            color="#fff"
-          />
-          <Text style={styles.joinBtnText}>
-            {lecture.status === 'live' ? 'Join Live' : 'Watch Recording'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <View style={styles.root}>
-        <View style={styles.bgBlobTop} />
-        <View style={styles.bgBlobBottom} />
+  // ============================================================
+  // OPEN LECTURE
+  // ============================================================
 
-        <View style={styles.header}>
-          <Image
-            source={require('../../../assets/icon.png')}
-            style={styles.brandLogo}
-            resizeMode="contain"
-          />
-          <View style={styles.titleContainer} pointerEvents="none">
-            <Text style={styles.brandTitle}>Garud Classes</Text>
+  const openLecture = lecture => {
+    navigation.navigate('Study', {
+      screen: 'StudyYoutubeVideoPlayer',
+
+      params: {
+        courseId: selectedCohort,
+
+        lectureId: lecture?._id,
+
+        lectureTitle:
+          lecture?.title,
+
+        status:
+          lecture?.status ||
+          'ended',
+      },
+    });
+  };
+
+
+  // ============================================================
+  // FORMAT TIME
+  // ============================================================
+
+  const formatTime = date => {
+    if (!date) {
+      return '';
+    }
+
+
+    const parsedDate = new Date(date);
+
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return '';
+    }
+
+
+    return parsedDate.toLocaleTimeString(
+      'en-IN',
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }
+    );
+  };
+
+
+  // ============================================================
+  // ANNOUNCEMENTS
+  // ============================================================
+
+  const openAnnouncements = async () => {
+    if (!selectedCohort) {
+      Alert.alert(
+        'No Active Batch',
+        'Select a batch to view announcements.'
+      );
+
+      return;
+    }
+
+
+    try {
+      await AsyncStorage.setItem(
+        `lastSeenAnnouncement_${selectedCohort}`,
+        new Date().toISOString()
+      );
+
+      setHasNewAnnouncement(false);
+
+    } catch (error) {
+      console.log(
+        'Announcement state error:',
+        error
+      );
+    }
+
+
+    navigation.navigate(
+      'Announcements',
+      {
+        batchId: selectedCohort,
+      }
+    );
+  };
+
+
+  // ============================================================
+  // QUICK ACTION
+  // ============================================================
+
+  const handleQuickAction = label => {
+    switch (label) {
+      case 'Study':
+        navigation.navigate('Study', {
+          state: {
+            routes: [
+              {
+                name: 'StudyHome',
+              },
+            ],
+          },
+        });
+
+        break;
+
+
+      case 'All Batches':
+        navigation.navigate('Batches', {
+          state: {
+            routes: [
+              {
+                name: 'BatchesList',
+              },
+            ],
+          },
+        });
+
+        break;
+
+
+      case 'Test Series':
+        navigation.navigate('MyTests', {
+          state: {
+            routes: [
+              {
+                name: 'MyTestsList',
+              },
+            ],
+          },
+        });
+
+        break;
+
+
+      case 'Results':
+        navigation.navigate('MyTests', {
+          state: {
+            routes: [
+              {
+                name: 'AttemptedTests',
+              },
+            ],
+          },
+        });
+
+        break;
+
+
+      case 'Downloads':
+        navigation.navigate('Study', {
+          state: {
+            routes: [
+              {
+                name: 'Downloads',
+              },
+            ],
+          },
+        });
+
+        break;
+
+
+      case 'Live Classes':
+        scrollRef.current?.scrollTo({
+          y: Math.max(
+            0,
+            scheduleSectionY.current - 20
+          ),
+
+          animated: true,
+        });
+
+        break;
+
+
+      case 'Announcements':
+        openAnnouncements();
+
+        break;
+
+
+      default:
+        break;
+    }
+  };
+
+
+  // ============================================================
+  // SCHEDULE CARD
+  // ============================================================
+
+  const renderScheduleCard = lecture => {
+    const isLive =
+      lecture?.status === 'live';
+
+    const isCancelled =
+      lecture?.status === 'cancelled';
+
+    const isEnded =
+      lecture?.status === 'ended' || lecture?.status === 'completed';
+
+    const statusData = isLive
+      ? {
+        label: 'LIVE',
+        color: '#DC2626',
+        background: '#FEF2F2',
+        icon: 'access-point',
+      }
+      : isCancelled
+        ? {
+          label: 'CANCELLED',
+          color: '#64748B',
+          background: '#F1F5F9',
+          icon: 'close-circle-outline',
+        }
+        : isEnded
+          ? {
+            label: 'COMPLETED',
+            color: '#16A34A',
+            background: '#F0FDF4',
+            icon: 'check-circle-outline',
+          }
+          : {
+            label: 'UPCOMING',
+            color: PURPLE,
+            background: '#F3E8FF',
+            icon: 'clock-outline',
+          };
+
+
+    return (
+      <TouchableOpacity
+        style={styles.scheduleCard}
+        activeOpacity={
+          isCancelled
+            ? 1
+            : 0.82
+        }
+        onPress={() => {
+          if (!isCancelled) {
+            openLecture(lecture);
+          }
+        }}
+      >
+        <View style={styles.scheduleTop}>
+          <View
+            style={[
+              styles.scheduleIcon,
+              {
+                backgroundColor:
+                  statusData.background,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={statusData.icon}
+              size={22}
+              color={statusData.color}
+            />
           </View>
 
-          <TouchableOpacity style={styles.menuBtn} activeOpacity={0.85} onPress={() => setMenuOpen(true)}>
-            <MaterialCommunityIcons name="menu" size={24} color="#0F172A" />
-          </TouchableOpacity>
+
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  statusData.background,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusBadgeText,
+                {
+                  color:
+                    statusData.color,
+                },
+              ]}
+            >
+              {statusData.label}
+            </Text>
+          </View>
         </View>
 
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent} 
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+
+        <Text
+          style={styles.scheduleSubject}
+          numberOfLines={1}
         >
-                    {/* Cohort Selector */}
-          {cohortsLoading ? (
-            <View style={styles.cohortLoadingWrap}>
-              <ActivityIndicator size="small" color="#1D4ED8" />
-              <Text style={styles.cohortLoadingText}>Loading batches…</Text>
-            </View>
-          ) : cohorts.length === 0 ? (
-            <View style={styles.noBatchCard}>
-              <MaterialCommunityIcons name="school-outline" size={36} color="#93C5FD" />
-              <Text style={styles.noBatchTitle}>Not enrolled in any batch</Text>
-              <Text style={styles.noBatchSubText}>
-                Ask your admin to enroll you in a batch to see your live classes here.
+          {lecture?.subject
+            ? `${lecture.subject}${lecture?.chapter ? ` • ${lecture.chapter}` : ''}`
+            : 'CLASS'}
+        </Text>
+
+
+        <Text
+          style={styles.scheduleTitle}
+          numberOfLines={2}
+        >
+          {lecture?.title || 'Scheduled Class'}
+        </Text>
+
+
+        <View style={styles.scheduleFooter}>
+          <View style={styles.scheduleTimeRow}>
+            <MaterialCommunityIcons
+              name="clock-outline"
+              size={14}
+              color={MUTED}
+            />
+
+            <Text style={styles.scheduleTime}>
+              {formatTime(
+                lecture?.scheduledAt
+              ) || 'Time unavailable'}
+            </Text>
+          </View>
+
+
+          {!isCancelled && (
+            <View style={styles.openClassButton}>
+              <MaterialCommunityIcons
+                name={
+                  isLive
+                    ? 'video-outline'
+                    : 'play-outline'
+                }
+                size={15}
+                color={PURPLE}
+              />
+
+              <Text style={styles.openClassText}>
+                {isLive
+                  ? 'Join'
+                  : 'Open'}
               </Text>
             </View>
-          ) : (
-            <>
-              {/* Premium Cohort Picker */}
-              <View style={styles.premiumPickerCard}>
-                <View style={styles.pickerHeader}>
-                  <MaterialCommunityIcons name="google-classroom" size={18} color="#1D4ED8" />
-                  <Text style={styles.pickerLabel}>My Active Batch</Text>
-                </View>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedCohort}
-                    onValueChange={(value) => setSelectedCohort(value)}
-                    style={styles.picker}
-                    dropdownIconColor="#1D4ED8"
-                  >
-                    {cohorts.map((c) => (
-                      <Picker.Item key={c._id} label={c.name ?? 'Unnamed Batch'} value={c._id} color="#0F172A" />
-                    ))}
-                  </Picker>
-                </View>
-              </View>
-
-              {/* Lecture Sections */}
-              {scheduleLoading ? (
-                <ActivityIndicator size="large" color="#1D4ED8" style={{ marginTop: 40, marginBottom: 40 }} />
-              ) : (
-                <>
-                  {/* LIVE CLASSES */}
-                  <View style={styles.horizontalSection}>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Live Classes</Text>
-                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.live.length}</Text></View>
-                    </View>
-                    {schedule.live.length === 0 ? (
-                      <View style={styles.emptyHorizontalCard}>
-                         <MaterialCommunityIcons name="broadcast" size={24} color="#93C5FD" />
-                         <Text style={styles.emptyHorizontalText}>No live classes scheduled</Text>
-                      </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                        {schedule.live.map(lecture => renderLectureCard(lecture))}
-                      </ScrollView>
-                    )}
-                  </View>
-
-                  {/* UPCOMING CLASSES */}
-                  <View style={styles.horizontalSection}>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Upcoming Classes</Text>
-                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.upcoming.length}</Text></View>
-                    </View>
-                    {schedule.upcoming.length === 0 ? (
-                      <View style={styles.emptyHorizontalCard}>
-                         <MaterialCommunityIcons name="calendar-clock" size={24} color="#93C5FD" />
-                         <Text style={styles.emptyHorizontalText}>No upcoming classes scheduled</Text>
-                      </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                        {schedule.upcoming.map(lecture => renderLectureCard(lecture))}
-                      </ScrollView>
-                    )}
-                  </View>
-
-                  {/* COMPLETED CLASSES */}
-                  <View style={styles.horizontalSection}>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Completed Classes</Text>
-                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.completed.length}</Text></View>
-                    </View>
-                    {schedule.completed.length === 0 ? (
-                      <View style={styles.emptyHorizontalCard}>
-                         <MaterialCommunityIcons name="check-circle-outline" size={24} color="#93C5FD" />
-                         <Text style={styles.emptyHorizontalText}>No completed classes</Text>
-                      </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                        {schedule.completed.map(lecture => renderLectureCard(lecture))}
-                      </ScrollView>
-                    )}
-                  </View>
-
-                  {/* CANCELLED CLASSES */}
-                  <View style={styles.horizontalSection}>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Cancelled</Text>
-                      <View style={styles.badgeBox}><Text style={styles.badgeText}>{schedule.cancelled?.length || 0}</Text></View>
-                    </View>
-                    {(!schedule.cancelled || schedule.cancelled.length === 0) ? (
-                      <View style={styles.emptyHorizontalCard}>
-                         <MaterialCommunityIcons name="cancel" size={24} color="#94A3B8" />
-                         <Text style={styles.emptyHorizontalText}>No cancelled classes</Text>
-                      </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                        {schedule.cancelled.map(lecture => renderLectureCard(lecture))}
-                      </ScrollView>
-                    )}
-                  </View>
-                </>
-              )}
-            </>
           )}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <Text style={styles.sectionSubTitle}>Jump right in</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+
+  // ============================================================
+  // SCHEDULE SECTION
+  // ============================================================
+
+  const renderScheduleSection = ({
+    title,
+    subtitle,
+    icon,
+    color,
+    background,
+    items,
+    emptyText,
+  }) => {
+    return (
+      <View style={styles.scheduleSection}>
+        <View style={styles.scheduleSectionHeader}>
+          <View
+            style={[
+              styles.scheduleSectionIcon,
+              {
+                backgroundColor:
+                  background,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={icon}
+              size={20}
+              color={color}
+            />
           </View>
 
-          <View style={styles.actionGrid}>
-            <TouchableOpacity
-              style={[styles.actionCard, styles.actionCardBlue]}
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate('Batches', { screen: 'BatchesList' })}
-            >
-              <View style={styles.actionIconWrap}>
-                <MaterialCommunityIcons name="compass-outline" size={26} color="#1D4ED8" />
-              </View>
-              <Text style={styles.actionTitle}>Explore Store</Text>
-              <Text style={styles.actionHint}>Find new courses</Text>
-              <View style={styles.actionFooter}>
-                <Text style={styles.actionFooterText}>Open</Text>
-                <MaterialCommunityIcons name="arrow-right" size={16} color="#1D4ED8" />
-              </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionCard, styles.actionCardGreen]}
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate('Batches', { screen: 'Downloads' })}
-            >
-              <View style={styles.actionIconWrap}>
-                <MaterialCommunityIcons name="download-circle-outline" size={26} color="#047857" />
-              </View>
-              <Text style={styles.actionTitle}>Downloads</Text>
-              <Text style={styles.actionHint}>Study offline anytime</Text>
-              <View style={styles.actionFooter}>
-                <Text style={[styles.actionFooterText, { color: '#047857' }]}>Open</Text>
-                <MaterialCommunityIcons name="arrow-right" size={16} color="#047857" />
-              </View>
-            </TouchableOpacity>
+          <View style={styles.scheduleSectionText}>
+            <Text style={styles.scheduleSectionTitle}>
+              {title}
+            </Text>
 
-            <TouchableOpacity
-              style={[styles.actionCard, styles.actionCardAmber]}
-              activeOpacity={0.88}
-              onPress={() => openSoon('Library')}
-            >
-              <View style={styles.actionIconWrap}>
-                <MaterialCommunityIcons name="bookshelf" size={26} color="#B45309" />
-              </View>
-              <Text style={styles.actionTitle}>Library</Text>
-              <Text style={styles.actionHint}>Books and notes</Text>
-              <View style={styles.actionFooter}>
-                <Text style={[styles.actionFooterText, { color: '#B45309' }]}>Open</Text>
-                <MaterialCommunityIcons name="arrow-right" size={16} color="#B45309" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionCard, styles.actionCardRose]}
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate('Battleground')}
-            >
-              <View style={styles.actionIconWrap}>
-                <MaterialCommunityIcons name="sword-cross" size={26} color="#BE123C" />
-              </View>
-              <Text style={styles.actionTitle}>Battleground</Text>
-              <Text style={styles.actionHint}>Compete and rank up</Text>
-              <View style={styles.actionFooter}>
-                <Text style={[styles.actionFooterText, { color: '#BE123C' }]}>Open</Text>
-                <MaterialCommunityIcons name="arrow-right" size={16} color="#BE123C" />
-              </View>
-            </TouchableOpacity>
+            <Text style={styles.scheduleSectionSubtitle}>
+              {subtitle}
+            </Text>
           </View>
 
-          <View style={styles.supportCard}>
-            <Text style={styles.supportTitle}>Need Quick Help?</Text>
-            <Text style={styles.supportSubTitle}>Access help, settings, or purchases from one place.</Text>
 
-            <View style={styles.supportActionsRow}>
-              <TouchableOpacity
-                style={styles.supportActionBtn}
-                onPress={() => navigation.navigate('HelpSupport')}
-                activeOpacity={0.85}
+          <View style={styles.scheduleCount}>
+            <Text style={styles.scheduleCountText}>
+              {items.length}
+            </Text>
+          </View>
+        </View>
+
+
+        {items.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={
+              styles.scheduleHorizontalContent
+            }
+          >
+            {items.map((item, index) => (
+              <View
+                key={String(item?._id) + '-' + index}
+                style={styles.scheduleCardContainer}
               >
-                <MaterialCommunityIcons name="lifebuoy" size={16} color="#1D4ED8" />
-                <Text style={styles.supportActionText}>Help & Support</Text>
+                {renderScheduleCard(item)}
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.scheduleEmptyCard}>
+            <View
+              style={[
+                styles.scheduleEmptyIcon,
+                {
+                  backgroundColor:
+                    background,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={icon}
+                size={22}
+                color={color}
+              />
+            </View>
+
+            <Text style={styles.scheduleEmptyText}>
+              {emptyText}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+
+  // ============================================================
+  // UI
+  // ============================================================
+
+  return (
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top']}
+    >
+      <View style={styles.root}>
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={
+            styles.scrollContent
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={PURPLE}
+              colors={[PURPLE]}
+            />
+          }
+        >
+          {/* HEADER */}
+
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() =>
+                setMenuOpen(true)
+              }
+              activeOpacity={0.75}
+            >
+              <MaterialCommunityIcons
+                name="menu"
+                size={25}
+                color={TEXT}
+              />
+            </TouchableOpacity>
+
+            <Text style={styles.headerLogoText}>
+              Garud Classes
+            </Text>
+
+
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={openAnnouncements}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons
+                  name="bell-outline"
+                  size={23}
+                  color={PURPLE_DARK}
+                />
+
+                {hasNewAnnouncement && (
+                  <View
+                    style={
+                      styles.notificationBadge
+                    }
+                  />
+                )}
               </TouchableOpacity>
 
+
               <TouchableOpacity
-                style={styles.supportActionBtn}
-                onPress={() => navigation.navigate('Batches', { screen: 'MyPurchases' })}
-                activeOpacity={0.85}
+                style={styles.profileButton}
+                onPress={() =>
+                  navigation.navigate(
+                    'MyProfile'
+                  )
+                }
+                activeOpacity={0.75}
               >
-                <MaterialCommunityIcons name="cart-outline" size={16} color="#1D4ED8" />
-                <Text style={styles.supportActionText}>My Purchases</Text>
+                <MaterialCommunityIcons
+                  name="account-outline"
+                  size={24}
+                  color={PURPLE}
+                />
               </TouchableOpacity>
             </View>
+          </View>
+
+
+          {/* WELCOME */}
+
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeEyebrow}>
+              GARUD CLASSES
+            </Text>
+
+            <Text style={styles.welcomeTitle}>
+              Hello, Student
+            </Text>
+
+            <Text style={styles.welcomeSubtitle}>
+              Continue learning and stay consistent with your goals.
+            </Text>
+          </View>
+
+
+          {/* ACTIVE BATCH */}
+
+          {cohortsLoading ? (
+            <View style={styles.batchLoadingCard}>
+              <ActivityIndicator
+                color={PURPLE}
+              />
+
+              <Text style={styles.loadingText}>
+                Loading your batch...
+              </Text>
+            </View>
+          ) : cohorts.length === 0 ? (
+            <View style={styles.emptyBatchCard}>
+              <View style={styles.emptyBatchIcon}>
+                <MaterialCommunityIcons
+                  name="school-outline"
+                  size={28}
+                  color={PURPLE}
+                />
+              </View>
+
+              <View style={styles.emptyBatchContent}>
+                <Text style={styles.emptyBatchTitle}>
+                  No active batch
+                </Text>
+
+                <Text style={styles.emptyBatchText}>
+                  Enroll in a batch to access classes and your study schedule.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.batchPickerCard}>
+              <View style={styles.batchPickerHeader}>
+                <View style={styles.batchIcon}>
+                  <MaterialCommunityIcons
+                    name="school-outline"
+                    size={20}
+                    color={PURPLE}
+                  />
+                </View>
+
+                <View>
+                  <Text style={styles.batchPickerLabel}>
+                    ACTIVE BATCH
+                  </Text>
+
+                  <Text style={styles.batchPickerHint}>
+                    Select your current learning batch
+                  </Text>
+                </View>
+              </View>
+
+
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={selectedCohort}
+                  onValueChange={
+                    setSelectedCohort
+                  }
+                  style={styles.picker}
+                  dropdownIconColor={PURPLE}
+                >
+                  {cohorts.map(cohort => (
+                    <Picker.Item
+                      key={cohort._id}
+                      label={
+                        cohort.name ||
+                        'Unnamed Batch'
+                      }
+                      value={cohort._id}
+                      color={TEXT}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          )}
+
+
+          {/* OVERVIEW */}
+
+          <View style={styles.sectionHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                Today's Overview
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                Your learning activity for today
+              </Text>
+            </View>
+          </View>
+
+
+          <View style={styles.statisticsRow}>
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor:
+                    '#F8F5FF',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor:
+                      '#EDE9FE',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={20}
+                  color="#7C3AED"
+                />
+              </View>
+
+              <Text style={styles.statNumber}>
+                {schedule.upcoming.length}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Upcoming
+              </Text>
+            </View>
+
+
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor:
+                    '#F0F7FF',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor:
+                      '#DBEAFE',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="check-circle-outline"
+                  size={20}
+                  color="#2563EB"
+                />
+              </View>
+
+              <Text style={styles.statNumber}>
+                {schedule.completed.length}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Completed
+              </Text>
+            </View>
+
+
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor:
+                    '#F0FDF4',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor:
+                      '#DCFCE7',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="school-outline"
+                  size={20}
+                  color="#16A34A"
+                />
+              </View>
+
+              <Text style={styles.statNumber}>
+                {cohorts.length}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Batches
+              </Text>
+            </View>
+
+
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor:
+                    '#FFF7ED',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor:
+                      '#FFEDD5',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="access-point"
+                  size={20}
+                  color="#EA580C"
+                />
+              </View>
+
+              <Text style={styles.statNumber}>
+                {schedule.live.length}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Live Now
+              </Text>
+            </View>
+          </View>
+
+
+          {/* QUICK ACCESS */}
+
+          <View style={styles.sectionHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                Quick Access
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                Open your frequently used sections
+              </Text>
+            </View>
+          </View>
+
+
+          <View style={styles.quickAccessCard}>
+            {QUICK_ACTIONS.map(item => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.quickAccessItem}
+                activeOpacity={0.72}
+                onPress={() =>
+                  handleQuickAction(
+                    item.label
+                  )
+                }
+              >
+                <View
+                  style={[
+                    styles.quickAccessIcon,
+                    {
+                      backgroundColor:
+                        item.background,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={item.icon}
+                    size={23}
+                    color={item.color}
+                  />
+                </View>
+
+                <Text
+                  style={styles.quickAccessLabel}
+                  numberOfLines={2}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+
+          {/* SCHEDULE */}
+
+          <View
+            onLayout={event => {
+              scheduleSectionY.current =
+                event.nativeEvent.layout.y;
+            }}
+          >
+            <View style={styles.sectionHeading}>
+              <View>
+                <Text style={styles.sectionTitle}>
+                  Today's Schedule
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Classes scheduled for today
+                </Text>
+              </View>
+            </View>
+
+
+            {scheduleLoading ? (
+              <View style={styles.scheduleLoader}>
+                <ActivityIndicator
+                  size="large"
+                  color={PURPLE}
+                />
+
+                <Text style={styles.loadingText}>
+                  Loading today's classes...
+                </Text>
+              </View>
+            ) : (
+              <>
+                {renderScheduleSection({
+                  title: 'Live Now',
+                  subtitle:
+                    'Classes currently in progress',
+                  icon: 'access-point',
+                  color: '#DC2626',
+                  background: '#FEF2F2',
+                  items: schedule.live,
+                  emptyText:
+                    'No classes are live right now.',
+                })}
+
+
+                {renderScheduleSection({
+                  title: 'Upcoming',
+                  subtitle:
+                    'Classes scheduled later today',
+                  icon: 'clock-outline',
+                  color: PURPLE,
+                  background: '#F3E8FF',
+                  items: schedule.upcoming,
+                  emptyText:
+                    'No upcoming classes today.',
+                })}
+
+
+                {renderScheduleSection({
+                  title: 'Completed',
+                  subtitle:
+                    'Classes completed today',
+                  icon: 'check-circle-outline',
+                  color: '#16A34A',
+                  background: '#F0FDF4',
+                  items: schedule.completed,
+                  emptyText:
+                    'No completed classes today.',
+                })}
+
+
+                {renderScheduleSection({
+                  title: 'Cancelled',
+                  subtitle:
+                    'Classes cancelled today',
+                  icon: 'close-circle-outline',
+                  color: '#64748B',
+                  background: '#F1F5F9',
+                  items: schedule.cancelled,
+                  emptyText:
+                    'No cancelled classes today.',
+                })}
+              </>
+            )}
           </View>
         </ScrollView>
 
-        
-        <Modal visible={menuOpen} animationType="slide" transparent={true} onRequestClose={() => setMenuOpen(false)}>
+
+        {/* DRAWER */}
+
+        <Modal
+          visible={menuOpen}
+          animationType="slide"
+          transparent
+          statusBarTranslucent
+          onRequestClose={() =>
+            setMenuOpen(false)
+          }
+        >
           <View style={styles.modalOverlay}>
-            <View style={styles.fullScreenDrawer}>
-              <View style={styles.menuHeader}>
-                <Text style={styles.menuHeaderTitle}>Menu</Text>
-                <TouchableOpacity onPress={() => setMenuOpen(false)} style={styles.menuCloseBtn}>
-                  <MaterialCommunityIcons name="close" size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
+            <View style={styles.drawer}>
+              <View style={styles.drawerHandle} />
 
-              <View style={styles.menuSection}>
-                <Text style={styles.menuSectionTitle}>Account</Text>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('MyProfile'); }}>
-                  <MaterialCommunityIcons name="account-circle-outline" size={24} color="#1D4ED8" style={{marginRight: 14}} />
-                  <Text style={styles.menuActionText}>My Profile</Text>
-                </TouchableOpacity>
+
+              <View style={styles.drawerHeader}>
+                <View>
+                  <Text style={styles.drawerTitle}>
+                    Menu
+                  </Text>
+
+                  <Text style={styles.drawerSubtitle}>
+                    Manage your account and preferences
+                  </Text>
+                </View>
+
+
                 <TouchableOpacity
-                  style={styles.menuActionBtn}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    navigation.navigate('Batches', { screen: 'MyPurchases' });
-                  }}
+                  style={styles.closeButton}
+                  onPress={() =>
+                    setMenuOpen(false)
+                  }
                 >
-                  <MaterialCommunityIcons name="cart-outline" size={24} color="#1D4ED8" style={{marginRight: 14}} />
-                  <Text style={styles.menuActionText}>My Purchases</Text>
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={22}
+                    color={MUTED}
+                  />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.menuSection}>
-                <Text style={styles.menuSectionTitle}>Essentials</Text>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('HelpSupport'); }}>
-                  <MaterialCommunityIcons name="lifebuoy" size={24} color="#1D4ED8" style={{marginRight: 14}} />
-                  <Text style={styles.menuActionText}>Help & Support</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuActionBtn} onPress={() => { setMenuOpen(false); navigation.navigate('Settings'); }}>
-                  <MaterialCommunityIcons name="cog-outline" size={24} color="#1D4ED8" style={{marginRight: 14}} />
-                  <Text style={styles.menuActionText}>Settings</Text>
-                </TouchableOpacity>
-              </View>
 
-              <View style={{ flex: 1 }} />
-              
+              <DrawerItem
+                icon="account-circle-outline"
+                title="My Profile"
+                onPress={() => {
+                  setMenuOpen(false);
+
+                  navigation.navigate(
+                    'MyProfile'
+                  );
+                }}
+              />
+
+
+              <DrawerItem
+                icon="cart-outline"
+                title="My Purchases"
+                onPress={() => {
+                  setMenuOpen(false);
+
+                  navigation.navigate(
+                    'Batches',
+                    {
+                      screen: 'MyPurchases',
+                    }
+                  );
+                }}
+              />
+
+
+              <DrawerItem
+                icon="lifebuoy"
+                title="Help & Support"
+                onPress={() => {
+                  setMenuOpen(false);
+
+                  navigation.navigate(
+                    'HelpSupport'
+                  );
+                }}
+              />
+
+              <View style={styles.drawerSpacer} />
+
+
               <TouchableOpacity
-                style={styles.logoutBtnFull}
+                style={styles.logoutButton}
                 onPress={async () => {
                   setMenuOpen(false);
+
                   await logout();
                 }}
               >
-                <MaterialCommunityIcons name="logout" size={20} color="#DC2626" style={{marginRight: 8}} />
-                <Text style={styles.logoutTextFull}>Logout</Text>
+                <MaterialCommunityIcons
+                  name="logout"
+                  size={19}
+                  color="#DC2626"
+                />
+
+                <Text style={styles.logoutText}>
+                  Logout
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -438,463 +1572,1081 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
+
+// ============================================================
+// DRAWER ITEM
+// ============================================================
+
+function DrawerItem({
+  icon,
+  title,
+  onPress,
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.drawerItem}
+      onPress={onPress}
+      activeOpacity={0.72}
+    >
+      <View style={styles.drawerIcon}>
+        <MaterialCommunityIcons
+          name={icon}
+          size={22}
+          color={PURPLE}
+        />
+      </View>
+
+
+      <Text style={styles.drawerItemText}>
+        {title}
+      </Text>
+
+
+      <MaterialCommunityIcons
+        name="chevron-right"
+        size={21}
+        color="#CBD5E1"
+      />
+    </TouchableOpacity>
+  );
+}
+
+
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
-  premiumPickerCard: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
   },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  pickerLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#64748B',
-    marginLeft: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  pickerContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  picker: {
-    width: '100%',
-    height: 50,
-    color: '#0F172A',
-  },
-  horizontalSection: {
-    marginTop: 20,
-  },
-  horizontalSectionHeader: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-  },
-  horizontalSectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  horizontalScroll: {
-    paddingHorizontal: 16,
-    gap: 12,
-    paddingBottom: 4,
-  },
-  horizontalLectureCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    width: 240,
-    minHeight: 160,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  emptyHorizontalCard: {
-    marginHorizontal: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyHorizontalText: {
-    marginTop: 8,
-    color: '#64748B',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
-    marginRight: 4,
-  },
-  livePillText: {
-    color: '#EF4444',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  lectureTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  lectureSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginVertical: 4,
-  },
-  lectureTime: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  joinBtn: {
-    backgroundColor: '#0F172A',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  joinBtnLive: {
-    backgroundColor: '#EF4444',
-  },
-  joinBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  badgeBox: {
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    marginTop: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-  },
-  sectionHeaderRow: {
-    marginTop: 0, // Reset to 0 since container handles it
-    marginBottom: 10,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+
   root: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: BACKGROUND,
   },
-  bgBlobTop: {
-    position: 'absolute',
-    top: -95,
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#DBEAFE',
-    opacity: 0.35,
+
+  scrollContent: {
+    paddingBottom: 125,
   },
-  bgBlobBottom: {
-    position: 'absolute',
-    bottom: -120,
-    left: -90,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: '#E0F2FE',
-    opacity: 0.45,
-  },
+
+
+  // HEADER
+
   header: {
+    height: 68,
+
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+
     flexDirection: 'row',
+
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: 'rgba(248,250,252,0.92)',
+
+    backgroundColor: WHITE,
   },
-  titleContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  brandLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-  },
-  brandTitle: {
-    color: '#0F172A',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  brandSubTitle: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  menuBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+
+  headerButton: {
+    width: 42,
+    height: 42,
+
+    borderRadius: 14,
+
+    backgroundColor: '#F8F7FC',
+
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  scrollContent: {
-    paddingTop: 4,
-    paddingBottom: 28,
-  },
-  heroCard: {
-    marginHorizontal: 16,
-    marginTop: 6,
-    overflow: 'hidden',
-    backgroundColor: '#1D4ED8',
+
     borderWidth: 1,
-    borderColor: '#1E40AF',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
+    borderColor: '#F0EDF8',
   },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  readyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15,23,42,0.20)',
-    borderWidth: 1,
-    borderColor: 'rgba(191,219,254,0.45)',
-    gap: 4,
-  },
-  readyPillText: {
-    color: '#DBEAFE',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    textTransform: 'uppercase',
-  },
-  heroGlowOne: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    top: -60,
-    right: -40,
-  },
-  heroGlowTwo: {
-    position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    bottom: -38,
-    left: -26,
-  },
-  welcomeGreeting: {
-    color: '#BFDBFE',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 4,
-  },
-  welcomeName: {
-    color: '#FFFFFF',
+
+  headerLogoText: {
+    marginLeft: 14,
     fontSize: 22,
     fontWeight: '900',
-    marginBottom: 4,
-  },
-  welcomeSubtext: {
-    color: '#DBEAFE',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  heroStatRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  heroStatPill: {
-    width: '31%',
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(191,219,254,0.35)',
-  },
-  heroStatLabel: {
-    marginTop: 4,
-    color: '#DBEAFE',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
-  sectionHeaderRow: {
-    marginTop: 16,
-    marginBottom: 8,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
     color: '#0F172A',
-    fontSize: 19,
-    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  sectionSubTitle: {
-    color: '#64748B',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  actionGrid: {
-    marginHorizontal: 16,
+
+  headerRight: {
+    marginLeft: 'auto',
+
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: ACTION_GAP,
+
+    alignItems: 'center',
+
+    gap: 9,
   },
-  actionCard: {
-    width: ACTION_CARD_WIDTH,
-    minHeight: 132,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 5,
-  },
-  actionCardBlue: { backgroundColor: '#EEF4FF', borderColor: '#D6E4FF' },
-  actionCardGreen: { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' },
-  actionCardAmber: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
-  actionCardRose: { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' },
-  actionIconWrap: {
-    width: 48,
-    height: 48,
+
+  profileButton: {
+    width: 42,
+    height: 42,
+
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+
+    backgroundColor: '#F3E8FF',
+
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-  },
-  actionTitle: {
-    color: '#0F172A',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  actionHint: {
-    marginTop: 4,
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  actionFooter: {
-    marginTop: 'auto',
-    paddingTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  actionFooterText: {
-    color: '#1D4ED8',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  supportCard: {
-    marginTop: 14,
-    marginHorizontal: 16,
-    borderRadius: 18,
+
     borderWidth: 1,
-    borderColor: '#DBEAFE',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderColor: '#E9D5FF',
   },
-  supportTitle: {
-    color: '#0F172A',
-    fontSize: 16,
-    fontWeight: '800',
+
+  notificationBadge: {
+    position: 'absolute',
+
+    top: 8,
+    right: 8,
+
+    width: 8,
+    height: 8,
+
+    borderRadius: 4,
+
+    backgroundColor: '#DC2626',
+
+    borderWidth: 1.5,
+    borderColor: WHITE,
   },
-  supportSubTitle: {
-    marginTop: 4,
-    color: '#64748B',
+
+
+  // WELCOME
+
+  welcomeContainer: {
+    paddingHorizontal: 18,
+
+    paddingTop: 20,
+
+    paddingBottom: 18,
+
+    backgroundColor: WHITE,
+  },
+
+  welcomeEyebrow: {
+    color: PURPLE,
+
+    fontSize: 9,
+
+    fontWeight: '900',
+
+    letterSpacing: 1.3,
+  },
+
+  welcomeTitle: {
+    marginTop: 6,
+
+    color: TEXT,
+
+    fontSize: 25,
+
+    fontWeight: '900',
+
+    letterSpacing: -0.6,
+  },
+
+  welcomeSubtitle: {
+    marginTop: 6,
+
+    color: MUTED,
+
     fontSize: 12,
-    fontWeight: '700',
+
+    lineHeight: 18,
+
+    fontWeight: '500',
   },
-  supportActionsRow: {
-    marginTop: 12,
+
+
+  // BATCH
+
+  batchLoadingCard: {
+    marginHorizontal: 16,
+
+    marginTop: 14,
+
+    minHeight: 86,
+
+    borderRadius: 18,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
     flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
     gap: 10,
   },
-  supportActionBtn: {
-    flex: 1,
-    borderRadius: 12,
+
+  loadingText: {
+    color: MUTED,
+
+    fontSize: 11,
+
+    fontWeight: '600',
+  },
+
+  emptyBatchCard: {
+    marginHorizontal: 16,
+
+    marginTop: 14,
+
+    padding: 15,
+
+    borderRadius: 18,
+
+    backgroundColor: WHITE,
+
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 9,
+    borderColor: BORDER,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+  },
+
+  emptyBatchIcon: {
+    width: 50,
+    height: 50,
+
+    borderRadius: 15,
+
+    backgroundColor: '#F3E8FF',
+
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
   },
-  supportActionText: {
-    color: '#1E3A8A',
-    fontSize: 12,
+
+  emptyBatchContent: {
+    flex: 1,
+
+    marginLeft: 13,
+  },
+
+  emptyBatchTitle: {
+    color: TEXT,
+
+    fontSize: 14,
+
     fontWeight: '800',
   },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  fullScreenDrawer: { backgroundColor: '#F8FAFC', width: '100%', height: '90%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40, elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 15 },
-  menuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 24, borderBottomWidth: 1, borderColor: '#E2E8F0', marginBottom: 24 },
-  menuHeaderTitle: { fontSize: 24, fontWeight: '900', color: '#0F172A' },
-  menuCloseBtn: { padding: 8, backgroundColor: '#E2E8F0', borderRadius: 20 },
-  menuSection: { marginBottom: 32 },
-  menuSectionTitle: { fontSize: 13, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
-  menuActionBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderColor: '#F1F5F9' },
-  menuActionText: { fontSize: 17, color: '#1E293B', fontWeight: '600' },
-  logoutBtnFull: { flexDirection: 'row', backgroundColor: '#FEE2E2', paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  logoutTextFull: { color: '#DC2626', fontSize: 16, fontWeight: '800' }
+
+  emptyBatchText: {
+    marginTop: 4,
+
+    color: MUTED,
+
+    fontSize: 10,
+
+    lineHeight: 15,
+
+    fontWeight: '500',
+  },
+
+  batchPickerCard: {
+    marginHorizontal: 16,
+
+    marginTop: 14,
+
+    borderRadius: 19,
+
+    padding: 14,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    shadowColor: PURPLE_DEEP,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.04,
+
+    shadowRadius: 10,
+
+    elevation: 2,
+  },
+
+  batchPickerHeader: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    marginBottom: 11,
+  },
+
+  batchIcon: {
+    width: 42,
+    height: 42,
+
+    borderRadius: 13,
+
+    backgroundColor: '#F3E8FF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginRight: 10,
+  },
+
+  batchPickerLabel: {
+    color: PURPLE,
+
+    fontSize: 9,
+
+    fontWeight: '900',
+
+    letterSpacing: 1,
+  },
+
+  batchPickerHint: {
+    marginTop: 3,
+
+    color: MUTED,
+
+    fontSize: 10,
+
+    fontWeight: '500',
+  },
+
+  pickerWrap: {
+    height: 50,
+
+    borderRadius: 13,
+
+    overflow: 'hidden',
+
+    backgroundColor: '#F8F7FC',
+
+    borderWidth: 1,
+
+    borderColor: '#F0EDF8',
+
+    justifyContent: 'center',
+  },
+
+  picker: {
+    height: 50,
+
+    color: TEXT,
+  },
+
+
+  // SECTION
+
+  sectionHeading: {
+    marginTop: 25,
+
+    marginBottom: 12,
+
+    paddingHorizontal: 18,
+  },
+
+  sectionTitle: {
+    color: TEXT,
+
+    fontSize: 18,
+
+    fontWeight: '900',
+
+    letterSpacing: -0.3,
+  },
+
+  sectionSubtitle: {
+    marginTop: 3,
+
+    color: MUTED,
+
+    fontSize: 10,
+
+    lineHeight: 15,
+
+    fontWeight: '500',
+  },
+
+
+  // STATISTICS
+
+  statisticsRow: {
+    paddingHorizontal: 16,
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+
+    gap: 7,
+  },
+
+  statCard: {
+    flex: 1,
+
+    minHeight: 105,
+
+    borderRadius: 17,
+
+    paddingHorizontal: 9,
+
+    paddingVertical: 11,
+
+    borderWidth: 1,
+
+    borderColor:
+      'rgba(226,232,240,0.75)',
+  },
+
+  statIcon: {
+    width: 34,
+    height: 34,
+
+    borderRadius: 11,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  statNumber: {
+    marginTop: 9,
+
+    color: TEXT,
+
+    fontSize: 21,
+
+    fontWeight: '900',
+  },
+
+  statLabel: {
+    marginTop: 2,
+
+    color: TEXT_SECONDARY,
+
+    fontSize: 9,
+
+    fontWeight: '700',
+  },
+
+
+  // QUICK ACCESS
+
+  quickAccessCard: {
+    marginHorizontal: 16,
+
+    paddingHorizontal: 7,
+
+    paddingVertical: 10,
+
+    borderRadius: 20,
+
+    backgroundColor: WHITE,
+
+    flexDirection: 'row',
+
+    flexWrap: 'wrap',
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    shadowColor: PURPLE_DEEP,
+
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+
+    shadowOpacity: 0.04,
+
+    shadowRadius: 12,
+
+    elevation: 2,
+  },
+
+  quickAccessItem: {
+    width: '25%',
+
+    minHeight: 84,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    paddingHorizontal: 3,
+  },
+
+  quickAccessIcon: {
+    width: 46,
+    height: 46,
+
+    borderRadius: 15,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  quickAccessLabel: {
+    marginTop: 7,
+
+    color: TEXT,
+
+    fontSize: 9,
+
+    lineHeight: 12,
+
+    fontWeight: '700',
+
+    textAlign: 'center',
+  },
+
+
+  // SCHEDULE SECTION
+
+  scheduleSection: {
+    marginBottom: 21,
+  },
+
+  scheduleSectionHeader: {
+    paddingHorizontal: 18,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    marginBottom: 11,
+  },
+
+  scheduleSectionIcon: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 13,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  scheduleSectionText: {
+    flex: 1,
+
+    marginLeft: 10,
+  },
+
+  scheduleSectionTitle: {
+    color: TEXT,
+
+    fontSize: 14,
+
+    fontWeight: '800',
+  },
+
+  scheduleSectionSubtitle: {
+    marginTop: 2,
+
+    color: MUTED,
+
+    fontSize: 9,
+
+    lineHeight: 13,
+
+    fontWeight: '500',
+  },
+
+  scheduleCount: {
+    minWidth: 30,
+    height: 30,
+
+    borderRadius: 10,
+
+    paddingHorizontal: 8,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  scheduleCountText: {
+    color: PURPLE,
+
+    fontSize: 11,
+
+    fontWeight: '900',
+  },
+
+  scheduleHorizontalContent: {
+    paddingLeft: 16,
+
+    paddingRight: 8,
+
+    paddingVertical: 10,
+  },
+
+  scheduleCardContainer: {
+    width: 260,
+
+    marginRight: 10,
+  },
+
+  scheduleCard: {
+    minHeight: 155,
+
+    borderRadius: 19,
+
+    padding: 14,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    shadowColor: PURPLE_DEEP,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.04,
+
+    shadowRadius: 9,
+
+    elevation: 2,
+  },
+
+  scheduleTop: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'space-between',
+  },
+
+  scheduleIcon: {
+    width: 39,
+    height: 39,
+
+    borderRadius: 12,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  statusBadge: {
+    borderRadius: 999,
+
+    paddingHorizontal: 8,
+
+    paddingVertical: 5,
+  },
+
+  statusBadgeText: {
+    fontSize: 8,
+
+    fontWeight: '900',
+
+    letterSpacing: 0.5,
+  },
+
+  scheduleSubject: {
+    marginTop: 14,
+
+    color: PURPLE,
+
+    fontSize: 9,
+
+    fontWeight: '900',
+
+    letterSpacing: 0.7,
+
+    textTransform: 'uppercase',
+  },
+
+  scheduleTitle: {
+    marginTop: 3,
+
+    minHeight: 38,
+
+    color: TEXT,
+
+    fontSize: 14,
+
+    lineHeight: 19,
+
+    fontWeight: '800',
+  },
+
+  scheduleFooter: {
+    marginTop: 10,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'space-between',
+  },
+
+  scheduleTimeRow: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 5,
+  },
+
+  scheduleTime: {
+    color: MUTED,
+
+    fontSize: 9,
+
+    fontWeight: '600',
+  },
+
+  openClassButton: {
+    minHeight: 32,
+
+    paddingHorizontal: 10,
+
+    borderRadius: 10,
+
+    backgroundColor: '#F3E8FF',
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 4,
+  },
+
+  openClassText: {
+    color: PURPLE,
+
+    fontSize: 9,
+
+    fontWeight: '800',
+  },
+
+  scheduleEmptyCard: {
+    marginHorizontal: 16,
+
+    minHeight: 68,
+
+    borderRadius: 16,
+
+    paddingHorizontal: 13,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+  },
+
+  scheduleEmptyIcon: {
+    width: 39,
+    height: 39,
+
+    borderRadius: 12,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  scheduleEmptyText: {
+    flex: 1,
+
+    marginLeft: 11,
+
+    color: MUTED,
+
+    fontSize: 10,
+
+    lineHeight: 15,
+
+    fontWeight: '600',
+  },
+
+
+  // CONTINUE LEARNING
+
+  continueLearningCard: {
+    marginHorizontal: 16,
+
+    minHeight: 104,
+
+    borderRadius: 19,
+
+    padding: 12,
+
+    backgroundColor: WHITE,
+
+    borderWidth: 1,
+    borderColor: BORDER,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    shadowColor: PURPLE_DEEP,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.04,
+
+    shadowRadius: 10,
+
+    elevation: 2,
+  },
+
+  thumbnail: {
+    width: 92,
+    height: 76,
+
+    borderRadius: 15,
+
+    backgroundColor: PURPLE_DEEP,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  playButton: {
+    width: 43,
+    height: 43,
+
+    borderRadius: 22,
+
+    backgroundColor: WHITE,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  learningInfo: {
+    flex: 1,
+
+    marginLeft: 12,
+
+    marginRight: 5,
+  },
+
+  learningSubject: {
+    color: PURPLE,
+
+    fontSize: 8,
+
+    fontWeight: '900',
+
+    letterSpacing: 0.7,
+  },
+
+  learningTitle: {
+    marginTop: 4,
+
+    color: TEXT,
+
+    fontSize: 13,
+
+    lineHeight: 18,
+
+    fontWeight: '800',
+  },
+
+  resumeRow: {
+    marginTop: 9,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 5,
+  },
+
+  resumeText: {
+    color: PURPLE,
+
+    fontSize: 9,
+
+    fontWeight: '700',
+  },
+
+
+  // SCHEDULE LOADER
+
+  scheduleLoader: {
+    minHeight: 150,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    gap: 12,
+  },
+
+
+  // DRAWER
+
+  modalOverlay: {
+    flex: 1,
+
+    backgroundColor:
+      'rgba(15,23,42,0.45)',
+
+    justifyContent: 'flex-end',
+  },
+
+  drawer: {
+    height: '72%',
+
+    backgroundColor: WHITE,
+
+    borderTopLeftRadius: 28,
+
+    borderTopRightRadius: 28,
+
+    paddingHorizontal: 20,
+
+    paddingTop: 10,
+
+    paddingBottom: 34,
+  },
+
+  drawerHandle: {
+    alignSelf: 'center',
+
+    width: 42,
+    height: 4,
+
+    borderRadius: 2,
+
+    backgroundColor: '#CBD5E1',
+
+    marginBottom: 18,
+  },
+
+  drawerHeader: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'space-between',
+
+    marginBottom: 15,
+  },
+
+  drawerTitle: {
+    color: TEXT,
+
+    fontSize: 23,
+
+    fontWeight: '900',
+  },
+
+  drawerSubtitle: {
+    marginTop: 4,
+
+    color: MUTED,
+
+    fontSize: 10,
+
+    fontWeight: '500',
+  },
+
+  closeButton: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 13,
+
+    backgroundColor: '#F8F7FC',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  drawerItem: {
+    minHeight: 64,
+
+    borderBottomWidth: 1,
+
+    borderBottomColor: '#F1F5F9',
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+  },
+
+  drawerIcon: {
+    width: 42,
+    height: 42,
+
+    borderRadius: 13,
+
+    backgroundColor: '#F3E8FF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  drawerItemText: {
+    flex: 1,
+
+    marginLeft: 12,
+
+    color: TEXT,
+
+    fontSize: 14,
+
+    fontWeight: '700',
+  },
+
+  drawerSpacer: {
+    flex: 1,
+  },
+
+  logoutButton: {
+    minHeight: 52,
+
+    borderRadius: 15,
+
+    backgroundColor: '#FEF2F2',
+
+    borderWidth: 1,
+
+    borderColor: '#FECACA',
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    gap: 7,
+  },
+
+  logoutText: {
+    color: '#DC2626',
+
+    fontSize: 14,
+
+    fontWeight: '800',
+  },
 });

@@ -1,95 +1,339 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ActivityIndicator, NativeModules, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  Alert,
+  ActivityIndicator,
+  NativeModules,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View,
+} from 'react-native';
+
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+
+import {
+  MaterialCommunityIcons,
+} from '@expo/vector-icons';
+
 import { WebView } from 'react-native-webview';
-import { downloadAttachment, getAttachmentUrls } from '../../utils/downloads';
+
+import {
+  downloadAttachment,
+  getAttachmentUrls,
+} from '../../utils/downloads';
+
+
+const COLORS = {
+  primary: '#6D28D9',
+  primaryDark: '#4C1D95',
+  primaryMedium: '#7C3AED',
+  primaryLight: '#EDE9FE',
+  primarySoft: '#F5F3FF',
+
+  white: '#FFFFFF',
+
+  text: '#171717',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+
+  border: '#E8E5EF',
+
+  background: '#F8F7FC',
+
+  danger: '#DC2626',
+};
+
+
+// ============================================================
+// PDF NATIVE MODULE CHECK
+// ============================================================
 
 let Pdf = null;
+
 try {
-  const PdfModule = require('react-native-pdf').default;
+  const PdfModule =
+    require('react-native-pdf').default;
+
   const hasNativeViewManager =
-    !!UIManager?.getViewManagerConfig?.('RNPDFPdfView') ||
-    !!UIManager?.getViewManagerConfig?.('PdfView') ||
+    !!UIManager?.getViewManagerConfig?.(
+      'RNPDFPdfView'
+    ) ||
+    !!UIManager?.getViewManagerConfig?.(
+      'PdfView'
+    ) ||
     !!NativeModules?.RNPDFPdfViewManager;
-  Pdf = hasNativeViewManager ? PdfModule : null;
+
+  Pdf = hasNativeViewManager
+    ? PdfModule
+    : null;
+
 } catch {
   Pdf = null;
 }
 
-export default function AttachmentViewerScreen({ route, navigation }) {
+
+// ============================================================
+// SCREEN
+// ============================================================
+
+export default function AttachmentViewerScreen({
+  route,
+  navigation,
+}) {
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(false);
-  const [pdfFallbackMode, setPdfFallbackMode] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const { attachment, localFile, title, lessonTitle, courseTitle } = route.params || {};
+
+  const {
+    attachment,
+    localFile,
+    title,
+    lessonTitle,
+    courseTitle,
+  } = route.params || {};
+
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [
+    pdfFallbackMode,
+    setPdfFallbackMode,
+  ] = useState(false);
+
+  const [
+    controlsVisible,
+    setControlsVisible,
+  ] = useState(true);
+
+
   const hideTimerRef = useRef(null);
+
+
+  // ==========================================================
+  // RESOLVE ATTACHMENT
+  // ==========================================================
 
   const resolved = useMemo(() => {
     if (localFile?.uri) {
-      const localSourceLink = String(localFile.sourceLink || '').trim();
-      const localUrls = localSourceLink ? getAttachmentUrls(localSourceLink) : null;
+      const localSourceLink =
+        String(
+          localFile.sourceLink || ''
+        ).trim();
+
+      const localUrls =
+        localSourceLink
+          ? getAttachmentUrls(
+            localSourceLink
+          )
+          : null;
+
+
       return {
-        displayTitle: String(localFile.title || title || 'Attachment'),
-        // Android WebView often cannot render local PDF file:// URIs reliably.
-        // Prefer original source preview URL when available.
-        webUri: String(localUrls?.previewUrl || localFile.uri),
-        pdfUri: String(localFile.uri),
-        usePdfRenderer: true,
+        displayTitle:
+          String(
+            localFile.title ||
+            title ||
+            'Attachment'
+          ),
+
+        webUri:
+          String(
+            localUrls?.previewUrl ||
+            localFile.uri
+          ),
+
+        pdfUri:
+          String(
+            localFile.uri
+          ),
+
+        usePdfRenderer:
+          localFile?.fileType === 'pdf' ||
+          localFile?.extension === 'pdf' ||
+          String(localFile.uri)
+            .toLowerCase()
+            .endsWith('.pdf'),
+
         canDownload: false,
-        sourceLink: localSourceLink,
-        isGoogleDrive: !!localUrls?.isGoogleDrive,
+
+        sourceLink:
+          localSourceLink,
+
+        isGoogleDrive:
+          !!localUrls?.isGoogleDrive,
+
+        fileType:
+          localFile?.fileType || 'file',
       };
     }
 
-    const link = String(attachment?.link || '');
-    const urls = getAttachmentUrls(link);
-    return {
-      displayTitle: String(attachment?.title || title || 'Attachment'),
-      webUri: urls.previewUrl,
-      pdfUri: '',
-      usePdfRenderer: false,
-      canDownload: true,
-      sourceLink: link,
-      isGoogleDrive: !!urls.isGoogleDrive,
-    };
-  }, [attachment, localFile, title]);
 
-  const initialUriRef = useRef(String(resolved.webUri || ''));
+    const link =
+      String(
+        attachment?.link || ''
+      ).trim();
+
+
+    const urls =
+      getAttachmentUrls(link);
+
+
+    return {
+      displayTitle:
+        String(
+          attachment?.title ||
+          title ||
+          'Attachment'
+        ),
+
+      webUri:
+        urls.previewUrl,
+
+      pdfUri: '',
+
+      usePdfRenderer: false,
+
+      canDownload: true,
+
+      sourceLink: link,
+
+      isGoogleDrive:
+        !!urls.isGoogleDrive,
+
+      fileType: 'remote',
+    };
+
+  }, [
+    attachment,
+    localFile,
+    title,
+  ]);
+
+
+  // ==========================================================
+  // INITIAL URI
+  // ==========================================================
+
+  const initialUriRef =
+    useRef(
+      String(
+        resolved.webUri || ''
+      )
+    );
+
 
   useEffect(() => {
-    initialUriRef.current = String(resolved.webUri || '');
+    initialUriRef.current =
+      String(
+        resolved.webUri || ''
+      );
   }, [resolved.webUri]);
+
+
+  // ==========================================================
+  // RESET PDF FALLBACK
+  // ==========================================================
 
   useEffect(() => {
     setPdfFallbackMode(false);
-  }, [resolved.pdfUri, resolved.webUri]);
+  }, [
+    resolved.pdfUri,
+    resolved.webUri,
+  ]);
+
+
+  // ==========================================================
+  // AUTO HIDE CONTROLS
+  // ==========================================================
+
+  const clearAutoHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(
+        hideTimerRef.current
+      );
+
+      hideTimerRef.current = null;
+    }
+  };
+
 
   const resetAutoHideTimer = () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 2500);
+    clearAutoHideTimer();
+
+    hideTimerRef.current =
+      setTimeout(() => {
+        setControlsVisible(false);
+      }, 3000);
   };
+
 
   const revealControls = () => {
     setControlsVisible(true);
+
     resetAutoHideTimer();
   };
 
+
+  const hideControls = () => {
+    clearAutoHideTimer();
+
+    setControlsVisible(false);
+  };
+
+
   useEffect(() => {
     setControlsVisible(true);
+
     resetAutoHideTimer();
+
     return () => {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      clearAutoHideTimer();
     };
-  }, [resolved.webUri, resolved.pdfUri]);
+  }, [
+    resolved.webUri,
+    resolved.pdfUri,
+  ]);
 
-  const isFullScreenPdf = !!(resolved.usePdfRenderer && !pdfFallbackMode && Pdf);
 
-  const handleShouldStart = (request) => {
-    const url = String(request?.url || '').trim();
-    if (!url) return false;
+  // ==========================================================
+  // PDF MODE
+  // ==========================================================
+
+  const isFullScreenPdf =
+    !!(
+      resolved.usePdfRenderer &&
+      !pdfFallbackMode &&
+      Pdf
+    );
+
+
+  // ==========================================================
+  // WEBVIEW NAVIGATION SECURITY
+  // ==========================================================
+
+  const handleShouldStart = (
+    request
+  ) => {
+    const url =
+      String(
+        request?.url || ''
+      ).trim();
+
+
+    if (!url) {
+      return false;
+    }
+
 
     if (
       url.startsWith('about:blank') ||
@@ -101,205 +345,799 @@ export default function AttachmentViewerScreen({ route, navigation }) {
       return true;
     }
 
+
     if (resolved.isGoogleDrive) {
-      const isTopFrame = request?.isTopFrame !== false;
-      if (!isTopFrame) return true;
+      const isTopFrame =
+        request?.isTopFrame !== false;
 
-      const isInitial = url === initialUriRef.current;
-      const isEmbeddedViewer = url.includes('drive.google.com/viewerng/viewer');
 
-      // Block navigation from "open in drive" arrows/buttons and keep user in-app.
-      if (!isInitial && !isEmbeddedViewer) return false;
+      if (!isTopFrame) {
+        return true;
+      }
+
+
+      const isInitial =
+        url ===
+        initialUriRef.current;
+
+
+      const isEmbeddedViewer =
+        url.includes(
+          'drive.google.com/viewerng/viewer'
+        );
+
+
+      if (
+        !isInitial &&
+        !isEmbeddedViewer
+      ) {
+        return false;
+      }
     }
+
 
     return true;
   };
 
+
+  // ==========================================================
+  // DOWNLOAD
+  // ==========================================================
+
   const onDownload = async () => {
     if (!resolved.sourceLink) {
-      Alert.alert('Unavailable', 'Attachment link is missing.');
+      Alert.alert(
+        'Unavailable',
+        'Attachment link is missing.'
+      );
+
       return;
     }
 
+
     setLoading(true);
+
+
     try {
-      const file = await downloadAttachment({
-        title: resolved.displayTitle,
-        link: resolved.sourceLink,
+      await downloadAttachment({
+        title:
+          resolved.displayTitle,
+
+        link:
+          resolved.sourceLink,
+
         lessonTitle,
+
         courseTitle,
       });
 
-      Alert.alert('Downloaded', 'Attachment saved in Downloads section.', [
-        {
-          text: 'Open Downloads',
-          onPress: () => navigation.navigate('Downloads'),
-        },
-        { text: 'OK' },
-      ]);
 
-      // Keep current viewer open after download.
-      if (file?.uri) {
-        // no-op
-      }
-    } catch (err) {
-      Alert.alert('Download failed', err?.message || 'Could not download attachment.');
+      Alert.alert(
+        'Download Complete',
+        'Attachment has been saved to My Downloads.',
+        [
+          {
+            text: 'Open Downloads',
+
+            onPress: () =>
+              navigation.navigate(
+                'Downloads'
+              ),
+          },
+
+          {
+            text: 'Continue Reading',
+            style: 'cancel',
+          },
+        ]
+      );
+
+    } catch (error) {
+      Alert.alert(
+        'Download Failed',
+
+        error?.message ||
+        'Could not download attachment.'
+      );
+
     } finally {
       setLoading(false);
     }
   };
 
+
+  // ==========================================================
+  // EMPTY ATTACHMENT
+  // ==========================================================
+
   if (!resolved.webUri) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={[styles.floatingBar, { top: insets.top + 8 }]}> 
-          <TouchableOpacity style={styles.floatingBtn} onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#0F172A" />
-          </TouchableOpacity>
-          <Text numberOfLines={1} style={styles.floatingTitle}>Attachment</Text>
-          <View style={styles.floatingBtnPlaceholder} />
-        </View>
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>Attachment URL is missing.</Text>
-        </View>
-      </SafeAreaView>
+      <>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={COLORS.background}
+        />
+
+        <SafeAreaView
+          style={styles.safeArea}
+          edges={['top', 'bottom']}
+        >
+          <View
+            style={[
+              styles.viewerHeader,
+              {
+                top: insets.top + 8,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() =>
+                navigation.goBack()
+              }
+              activeOpacity={0.75}
+            >
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={21}
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.titlePill}>
+              <Text
+                numberOfLines={1}
+                style={styles.viewerTitle}
+              >
+                Attachment
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.controlButtonPlaceholder
+              }
+            />
+          </View>
+
+
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrap}>
+              <MaterialCommunityIcons
+                name="file-alert-outline"
+                size={42}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <Text style={styles.emptyTitle}>
+              Attachment Unavailable
+            </Text>
+
+            <Text style={styles.emptyText}>
+              The attachment URL is missing or
+              could not be loaded.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() =>
+                navigation.goBack()
+              }
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={17}
+                color="#FFFFFF"
+              />
+
+              <Text
+                style={
+                  styles.backButtonText
+                }
+              >
+                Go Back
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
+
+  // ==========================================================
+  // MAIN VIEWER
+  // ==========================================================
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      {controlsVisible && (
-        <View style={[styles.floatingBar, { top: insets.top + 8 }]}> 
-          <TouchableOpacity style={styles.floatingBtn} onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#0F172A" />
-          </TouchableOpacity>
+    <>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={COLORS.white}
+      />
 
-          <Text numberOfLines={1} style={styles.floatingTitle}>{resolved.displayTitle}</Text>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={['top', 'bottom']}
+      >
+        {/* ===================================================
+            FLOATING CONTROLS
+        =================================================== */}
 
-          {resolved.canDownload ? (
-            <TouchableOpacity style={styles.floatingBtn} onPress={onDownload} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator size="small" color="#1D4ED8" />
-              ) : (
-                <MaterialCommunityIcons name="download" size={20} color="#1D4ED8" />
-              )}
+        {controlsVisible && (
+          <View
+            style={[
+              styles.viewerHeader,
+              {
+                top: insets.top + 8,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() =>
+                navigation.goBack()
+              }
+              activeOpacity={0.75}
+              hitSlop={{
+                top: 8,
+                bottom: 8,
+                left: 8,
+                right: 8,
+              }}
+            >
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={21}
+                color={COLORS.primary}
+              />
             </TouchableOpacity>
-          ) : (
-            <View style={styles.floatingBtnPlaceholder} />
-          )}
-        </View>
-      )}
 
-      {isFullScreenPdf ? (
-        <Pdf
-          source={{ uri: resolved.pdfUri, cache: true }}
-          style={styles.pdfView}
-          trustAllCerts
-          enablePaging={false}
-          fitPolicy={0}
-          onLoadComplete={resetAutoHideTimer}
-          onPageChanged={resetAutoHideTimer}
-          onError={() => {
-            setPdfFallbackMode(true);
-            Alert.alert('Preview issue', 'Switching to web preview for this file.');
-          }}
-        />
-      ) : (
-        <WebView
-          source={{ uri: resolved.webUri }}
-          style={styles.webView}
-          startInLoadingState
-          allowFileAccess
-          allowsInlineMediaPlayback
-          setSupportMultipleWindows={false}
-          builtInZoomControls
-          displayZoomControls={false}
-          scalesPageToFit
-          onLoadEnd={resetAutoHideTimer}
-          onShouldStartLoadWithRequest={handleShouldStart}
-          renderLoading={() => (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color="#1D4ED8" />
-            </View>
-          )}
-        />
-      )}
 
-      {!controlsVisible && (
-        <TouchableOpacity
-          style={styles.tapToShowOverlay}
-          activeOpacity={1}
-          onPress={revealControls}
-        />
-      )}
-    </SafeAreaView>
+            <TouchableOpacity
+              style={styles.titlePill}
+              activeOpacity={0.85}
+              onPress={hideControls}
+            >
+              <View
+                style={
+                  styles.titleIconWrap
+                }
+              >
+                <MaterialCommunityIcons
+                  name={
+                    isFullScreenPdf
+                      ? 'file-pdf-box'
+                      : 'file-document-outline'
+                  }
+                  size={15}
+                  color={COLORS.primary}
+                />
+              </View>
+
+              <Text
+                numberOfLines={1}
+                style={styles.viewerTitle}
+              >
+                {resolved.displayTitle}
+              </Text>
+
+              <MaterialCommunityIcons
+                name="chevron-up"
+                size={16}
+                color={
+                  COLORS.textMuted
+                }
+              />
+            </TouchableOpacity>
+
+
+            {resolved.canDownload ? (
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={onDownload}
+                disabled={loading}
+                activeOpacity={0.75}
+                hitSlop={{
+                  top: 8,
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                }}
+              >
+                {loading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={COLORS.primary}
+                  />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="download-outline"
+                    size={21}
+                    color={COLORS.primary}
+                  />
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={
+                  styles.controlButtonPlaceholder
+                }
+              />
+            )}
+          </View>
+        )}
+
+
+        {/* ===================================================
+            PDF VIEWER
+        =================================================== */}
+
+        {isFullScreenPdf ? (
+          <Pdf
+            source={{
+              uri: resolved.pdfUri,
+              cache: true,
+            }}
+            style={styles.pdfView}
+            trustAllCerts
+            enablePaging={false}
+            fitPolicy={0}
+            spacing={4}
+            onLoadComplete={() => {
+              resetAutoHideTimer();
+            }}
+            onPageChanged={() => {
+              resetAutoHideTimer();
+            }}
+            onError={(error) => {
+              console.error(
+                'PDF viewer error:',
+                error
+              );
+
+              setPdfFallbackMode(true);
+
+              Alert.alert(
+                'Preview Issue',
+                'Native PDF preview is unavailable. Switching to web preview.'
+              );
+            }}
+          />
+        ) : (
+          <WebView
+            source={{
+              uri: resolved.webUri,
+            }}
+            style={styles.webView}
+            startInLoadingState
+            allowFileAccess
+            allowsInlineMediaPlayback
+            setSupportMultipleWindows={false}
+            builtInZoomControls
+            displayZoomControls={false}
+            scalesPageToFit
+            onLoadEnd={() => {
+              resetAutoHideTimer();
+            }}
+            onShouldStartLoadWithRequest={
+              handleShouldStart
+            }
+            renderLoading={() => (
+              <View
+                style={
+                  styles.loadingContainer
+                }
+              >
+                <View
+                  style={
+                    styles.loadingIconWrap
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name="file-document-outline"
+                    size={32}
+                    color={COLORS.primary}
+                  />
+                </View>
+
+                <ActivityIndicator
+                  size="large"
+                  color={COLORS.primary}
+                  style={{
+                    marginTop: 18,
+                  }}
+                />
+
+                <Text
+                  style={
+                    styles.loadingTitle
+                  }
+                >
+                  Opening Attachment
+                </Text>
+
+                <Text
+                  style={
+                    styles.loadingText
+                  }
+                >
+                  Preparing your study material...
+                </Text>
+              </View>
+            )}
+          />
+        )}
+
+
+        {/* ===================================================
+            REVEAL CONTROLS BUTTON
+
+            IMPORTANT:
+            This replaces your full screen transparent overlay.
+            PDF/WebView scrolling and zooming remain interactive.
+        =================================================== */}
+
+        {!controlsVisible && (
+          <TouchableOpacity
+            style={[
+              styles.revealButton,
+              {
+                top: insets.top + 10,
+              },
+            ]}
+            onPress={revealControls}
+            activeOpacity={0.75}
+            hitSlop={{
+              top: 12,
+              bottom: 12,
+              left: 12,
+              right: 12,
+            }}
+          >
+            <MaterialCommunityIcons
+              name="chevron-down"
+              size={20}
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        )}
+      </SafeAreaView>
+    </>
   );
 }
 
+
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  webView: { flex: 1, backgroundColor: '#FFFFFF' },
-  pdfView: { flex: 1, backgroundColor: '#FFFFFF' },
-  centered: {
+  safeArea: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.white,
   },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 14,
-    fontWeight: '700',
+
+
+  // =========================================================
+  // VIEWERS
+  // =========================================================
+
+  webView: {
+    flex: 1,
+    backgroundColor: COLORS.white,
   },
-  downloadBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  pdfView: {
+    flex: 1,
+    backgroundColor: '#F1F0F5',
   },
-  floatingBar: {
+
+
+  // =========================================================
+  // FLOATING HEADER
+  // =========================================================
+
+  viewerHeader: {
     position: 'absolute',
-    top: 10,
+
     left: 12,
     right: 12,
-    zIndex: 10,
+
+    zIndex: 100,
+
     flexDirection: 'row',
     alignItems: 'center',
+
+    elevation: 10,
   },
-  floatingBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+
+  controlButton: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 13,
+
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderColor: COLORS.primaryLight,
+
+    backgroundColor:
+      'rgba(255,255,255,0.97)',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    shadowColor: COLORS.primaryDark,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+
+    elevation: 6,
+  },
+
+  controlButtonPlaceholder: {
+    width: 40,
+    height: 40,
+  },
+
+
+  // =========================================================
+  // TITLE
+  // =========================================================
+
+  titlePill: {
+    flex: 1,
+
+    minWidth: 0,
+
+    minHeight: 40,
+
+    marginHorizontal: 8,
+
+    paddingHorizontal: 10,
+
+    borderRadius: 14,
+
+    backgroundColor:
+      'rgba(255,255,255,0.97)',
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    shadowColor: COLORS.primaryDark,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+
+    elevation: 5,
+  },
+
+  titleIconWrap: {
+    width: 28,
+    height: 28,
+
+    borderRadius: 9,
+
+    backgroundColor:
+      COLORS.primarySoft,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginRight: 7,
+  },
+
+  viewerTitle: {
+    flex: 1,
+
+    color: COLORS.primaryDark,
+
+    fontSize: 11,
+    fontWeight: '800',
+
+    textAlign: 'center',
+  },
+
+
+  // =========================================================
+  // REVEAL BUTTON
+  // =========================================================
+
+  revealButton: {
+    position: 'absolute',
+
+    right: 14,
+
+    zIndex: 100,
+
+    width: 40,
+    height: 40,
+
+    borderRadius: 13,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor:
+      'rgba(255,255,255,0.96)',
+
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+
+    shadowColor: COLORS.primaryDark,
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+
+    elevation: 7,
+  },
+
+
+  // =========================================================
+  // LOADING
+  // =========================================================
+
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor:
+      COLORS.background,
+
+    paddingHorizontal: 30,
+  },
+
+  loadingIconWrap: {
+    width: 72,
+    height: 72,
+
+    borderRadius: 24,
+
+    backgroundColor:
+      COLORS.primarySoft,
+
+    borderWidth: 1,
+    borderColor:
+      COLORS.primaryLight,
+
     alignItems: 'center',
     justifyContent: 'center',
   },
-  floatingBtnPlaceholder: {
-    width: 36,
-    height: 36,
+
+  loadingTitle: {
+    color: COLORS.text,
+
+    fontSize: 17,
+    fontWeight: '900',
+
+    marginTop: 16,
   },
-  floatingTitle: {
-    flex: 1,
-    marginHorizontal: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    color: '#0F172A',
-    fontSize: 12,
-    fontWeight: '700',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+
+  loadingText: {
+    color: COLORS.textSecondary,
+
+    fontSize: 11,
+    fontWeight: '600',
+
+    marginTop: 5,
+
     textAlign: 'center',
   },
-  tapToShowOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    zIndex: 8,
+
+
+  // =========================================================
+  // EMPTY
+  // =========================================================
+
+  emptyContainer: {
+    flex: 1,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    paddingHorizontal: 30,
+
+    backgroundColor:
+      COLORS.background,
+  },
+
+  emptyIconWrap: {
+    width: 82,
+    height: 82,
+
+    borderRadius: 27,
+
+    backgroundColor:
+      COLORS.primarySoft,
+
+    borderWidth: 1,
+    borderColor:
+      COLORS.primaryLight,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyTitle: {
+    color: COLORS.text,
+
+    fontSize: 20,
+    fontWeight: '900',
+
+    marginTop: 18,
+  },
+
+  emptyText: {
+    color: COLORS.textSecondary,
+
+    fontSize: 12,
+    fontWeight: '600',
+
+    lineHeight: 19,
+
+    textAlign: 'center',
+
+    marginTop: 7,
+  },
+
+  backButton: {
+    minHeight: 46,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    gap: 7,
+
+    backgroundColor:
+      COLORS.primary,
+
+    borderRadius: 14,
+
+    paddingHorizontal: 22,
+
+    marginTop: 20,
+
+    shadowColor:
+      COLORS.primaryDark,
+
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+
+    elevation: 5,
+  },
+
+  backButtonText: {
+    color: '#FFFFFF',
+
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

@@ -80,7 +80,7 @@ export const getCourse = async (courseId) => {
   const course = response.data;
   
   const allLectures = [];
-  if (Array.isArray(course.subjects)) {
+  if (Array.isArray(course.subjects) && course.subjects.length > 0) {
     course.subjects.forEach(subject => {
       if (Array.isArray(subject.chapters)) {
         subject.chapters.forEach(chapter => {

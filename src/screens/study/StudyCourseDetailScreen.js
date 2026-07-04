@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+
 import {
   View,
   Text,
@@ -7,22 +8,98 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
-  Dimensions,
-} from "react-native";
+  StatusBar,
+  RefreshControl,
+} from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from "../../components/AppHeader";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import apiClient from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
-const { width } = Dimensions.get('window');
-const GRID_GAP = 12;
-const SCREEN_PADDING = 16;
-const CARD_WIDTH = (width - SCREEN_PADDING * 2 - GRID_GAP) / 2;
+import { LinearGradient } from 'expo-linear-gradient';
+
+import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+
+const COLORS = {
+  primary: '#6D28D9',
+  primaryDark: '#4C1D95',
+  primaryMedium: '#7C3AED',
+  primaryLight: '#EDE9FE',
+  primarySoft: '#F5F3FF',
+
+  background: '#F8F7FC',
+  white: '#FFFFFF',
+
+  text: '#171717',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+
+  border: '#E8E5EF',
+
+  success: '#16A34A',
+  successLight: '#DCFCE7',
+
+  orange: '#EA580C',
+  orangeLight: '#FFEDD5',
+
+  blue: '#2563EB',
+  blueLight: '#DBEAFE',
+
+  danger: '#DC2626',
+  dangerLight: '#FEE2E2',
+};
+
+const SUBJECT_PALETTES = [
+  {
+    background: '#F5F3FF',
+    iconBackground: '#EDE9FE',
+    accent: '#6D28D9',
+    gradient: ['#6D28D9', '#8B5CF6'],
+  },
+  {
+    background: '#EFF6FF',
+    iconBackground: '#DBEAFE',
+    accent: '#2563EB',
+    gradient: ['#2563EB', '#3B82F6'],
+  },
+  {
+    background: '#FFF7ED',
+    iconBackground: '#FFEDD5',
+    accent: '#EA580C',
+    gradient: ['#EA580C', '#F97316'],
+  },
+  {
+    background: '#FDF2F8',
+    iconBackground: '#FCE7F3',
+    accent: '#DB2777',
+    gradient: ['#DB2777', '#EC4899'],
+  },
+  {
+    background: '#F0FDF4',
+    iconBackground: '#DCFCE7',
+    accent: '#16A34A',
+    gradient: ['#16A34A', '#22C55E'],
+  },
+];
 
 function normalizeCoursePayload(payload) {
-  if (!payload || typeof payload !== 'object') return null;
-  if (payload.course && typeof payload.course === 'object') return payload.course;
-  if (payload.data && typeof payload.data === 'object') return payload.data;
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  if (
+    payload.course &&
+    typeof payload.course === 'object'
+  ) {
+    return payload.course;
+  }
+
+  if (
+    payload.data &&
+    typeof payload.data === 'object'
+  ) {
+    return payload.data;
+  }
+
   return payload;
 }
 
@@ -37,160 +114,412 @@ async function fetchBestCoursePayload(courseId) {
 
   for (const endpoint of detailEndpoints) {
     try {
-      const res = await apiClient.get(endpoint);
-      candidates.push(res?.data);
-    } catch {
-      // Keep trying the next endpoint.
+      const response = await apiClient.get(endpoint);
+
+      candidates.push(response?.data);
+    } catch (error) {
+      console.log(
+        `Course endpoint failed: ${endpoint}`
+      );
     }
   }
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    return null;
+  }
+
   return normalizeCoursePayload(candidates[0]);
 }
 
-export default function StudyCourseDetailScreen({ route, navigation }) {
-  const { courseId, purchased: initialPurchasedStatus } = route.params || {};
+function formatScheduledDate(value) {
+  if (!value) {
+    return 'Available Now';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Available Now';
+  }
+
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+export default function StudyCourseDetailScreen({
+  route,
+  navigation,
+}) {
+  const {
+    courseId,
+    purchased: initialPurchasedStatus,
+  } = route.params || {};
+
+  const { logout } = useAuth();
 
   const [course, setCourse] = useState(null);
+
   const [loading, setLoading] = useState(true);
-  const [purchased, setPurchased] = useState(initialPurchasedStatus);
-  const [activeTab, setActiveTab] = useState('Subjects');
-  
-  const { logout } = useAuth();
-  const [busyTestId, setBusyTestId] = useState('');
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [purchased, setPurchased] = useState(
+    initialPurchasedStatus
+  );
+
+  const [activeTab, setActiveTab] =
+    useState('Subjects');
+
+  const [busyTestId, setBusyTestId] =
+    useState('');
 
   const startTest = async (test) => {
-    console.log("Attempting to start test:", test?._id, "busy:", busyTestId);
     if (!test?._id) {
-      Alert.alert("Error", "Test ID is missing!");
+      Alert.alert(
+        'Unable to Start',
+        'Test ID is missing.'
+      );
+
       return;
     }
-    if (busyTestId) return;
+
+    if (busyTestId) {
+      return;
+    }
 
     setBusyTestId(test._id);
+
     try {
-      console.log("Calling API POST /tests/", test._id, "/start with courseId:", courseId);
-      const res = await apiClient.post(`/tests/${test._id}/start`, {
-        batchId: courseId,
-      });
+      const response = await apiClient.post(
+        `/tests/${test._id}/start`,
+        {
+          batchId: courseId,
+        }
+      );
 
       navigation.navigate('TestAttempt', {
-        test: res.data.test,
-        attempt: res.data.attempt,
+        test: response.data.test,
+        attempt: response.data.attempt,
         batchId: courseId,
       });
-    } catch (e) {
-      console.log("Error starting test:", e?.message, e?.response?.data);
-      if (e.response?.status === 401) {
+    } catch (error) {
+      console.log(
+        'Error starting test:',
+        error?.message,
+        error?.response?.data
+      );
+
+      if (error.response?.status === 401) {
         logout();
+
         return;
       }
 
-      const message = e.response?.data?.message || 'Could not start test.';
-      if (e.response?.status === 400 && message.toLowerCase().includes('already submitted')) {
-        navigation.navigate('TestResult', { testId: test._id });
+      const message =
+        error.response?.data?.message ||
+        'Could not start test.';
+
+      if (
+        error.response?.status === 400 &&
+        message
+          .toLowerCase()
+          .includes('already submitted')
+      ) {
+        navigation.navigate('TestResult', {
+          testId: test._id,
+        });
+
         return;
       }
 
-      Alert.alert('Unable to start', message);
+      Alert.alert('Unable to Start', message);
     } finally {
       setBusyTestId('');
     }
   };
 
-  useEffect(() => {
-    const fetchCourse = async () => {
+  const fetchCourse = async (
+    isRefresh = false
+  ) => {
+    if (!isRefresh) {
       setLoading(true);
+    }
+
+    try {
+      let verifiedPurchased = purchased;
+
       if (typeof purchased !== 'boolean') {
         try {
-          const checkRes = await apiClient.get('/study/my-courses');
-          const myCourses = checkRes.data;
-          const isPurchased = myCourses.some(
-            (p) => String(p.course?._id || p.course?.id) === String(courseId)
-          );
-          setPurchased(isPurchased);
+          const checkResponse =
+            await apiClient.get(
+              '/study/my-courses'
+            );
 
-          if (!isPurchased) {
-            Alert.alert('Purchase Required', 'Please purchase this course to access it.', [
-              { text: 'OK', onPress: () => navigation.goBack() },
-            ]);
-            setLoading(false);
+          const myCourses = Array.isArray(
+            checkResponse.data
+          )
+            ? checkResponse.data
+            : [];
+
+          verifiedPurchased = myCourses.some(
+            (purchase) =>
+              String(
+                purchase?.course?._id ||
+                  purchase?.course?.id
+              ) === String(courseId)
+          );
+
+          setPurchased(verifiedPurchased);
+
+          if (!verifiedPurchased) {
+            Alert.alert(
+              'Purchase Required',
+              'Please purchase this course to access it.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () =>
+                    navigation.goBack(),
+                },
+              ]
+            );
+
             return;
           }
-        } catch (err) {
-          Alert.alert('Access Check Failed', 'Could not verify purchase status. Please try again.');
-          setLoading(false);
+        } catch (error) {
+          Alert.alert(
+            'Access Check Failed',
+            'Could not verify purchase status. Please try again.'
+          );
+
           return;
         }
       }
 
-      try {
-        const [normalizedCourse, pubTestsRes] = await Promise.all([
-          fetchBestCoursePayload(courseId),
-          apiClient.get('/tests/published')
-        ]);
-        if (!normalizedCourse) {
-          throw new Error('Course payload missing');
-        }
+      const [
+        normalizedCourse,
+        publishedTestsResponse,
+      ] = await Promise.all([
+        fetchBestCoursePayload(courseId),
 
-        const pubMap = {};
-        (pubTestsRes.data || []).forEach(t => {
-          if (t && t._id) pubMap[String(t._id)] = t;
-        });
+        apiClient.get('/tests/published'),
+      ]);
 
-        if (Array.isArray(normalizedCourse.tests)) {
-          normalizedCourse.tests = normalizedCourse.tests.map(t => {
-            const pubData = pubMap[String(t._id)] || {};
-            return {
-              ...t,
-              attempted: !!pubData.attempted,
-            };
-          });
-        }
-
-        setCourse(normalizedCourse);
-      } catch (err) {
-        Alert.alert("Error", "Failed to load course details.");
-      } finally {
-        setLoading(false);
+      if (!normalizedCourse) {
+        throw new Error(
+          'Course payload missing'
+        );
       }
-    };
-    fetchCourse();
-  }, [courseId, purchased, navigation]);
 
-  const handleOpenSubject = (subject) => {
-    navigation.navigate('StudySubjectDetail', { courseId, purchased, subject });
+      const publishedTestMap = {};
+
+      (
+        publishedTestsResponse.data || []
+      ).forEach((test) => {
+        if (test?._id) {
+          publishedTestMap[
+            String(test._id)
+          ] = test;
+        }
+      });
+
+      if (
+        Array.isArray(normalizedCourse.tests)
+      ) {
+        normalizedCourse.tests =
+          normalizedCourse.tests.map(
+            (test) => {
+              const publishedData =
+                publishedTestMap[
+                  String(test._id)
+                ] || {};
+
+              return {
+                ...test,
+
+                attempted:
+                  !!publishedData.attempted,
+              };
+            }
+          );
+      }
+
+      setCourse(normalizedCourse);
+    } catch (error) {
+      console.log(
+        'Course detail loading error:',
+        error
+      );
+
+      Alert.alert(
+        'Unable to Load Course',
+        'Failed to load course details.'
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
+  useEffect(() => {
+    fetchCourse();
+  }, [courseId]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+
+    fetchCourse(true);
+  };
+
+  const handleOpenSubject = (subject) => {
+    navigation.navigate('StudySubjectDetail', {
+      courseId,
+      purchased,
+      subject,
+    });
+  };
+
+  const subjects = Array.isArray(
+    course?.subjects
+  )
+    ? course.subjects
+    : [];
+
+  const tests = Array.isArray(course?.tests)
+    ? course.tests
+    : [];
+
   const renderSubjectsTab = () => {
-    const subjects = course?.subjects || [];
-    
     if (subjects.length === 0) {
-      return <Text style={styles.emptyText}>No subjects available for this course.</Text>;
+      return (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <MaterialCommunityIcons
+              name="book-open-blank-variant-outline"
+              size={46}
+              color={COLORS.primary}
+            />
+          </View>
+
+          <Text style={styles.emptyTitle}>
+            No Subjects Yet
+          </Text>
+
+          <Text style={styles.emptyDescription}>
+            Subjects added to this course will
+            appear here.
+          </Text>
+        </View>
+      );
     }
 
     return (
-      <View style={styles.gridWrap}>
+      <View style={styles.subjectList}>
         {subjects.map((subject, index) => {
-          const acronym = subject.name ? subject.name.substring(0, 2).toUpperCase() : 'SU';
-          // Stubbing progress to 0% as per requirements
-          const progressPct = 0; 
+          const palette =
+            SUBJECT_PALETTES[
+              index % SUBJECT_PALETTES.length
+            ];
+
+          const acronym = subject?.name
+            ? subject.name
+                .substring(0, 2)
+                .toUpperCase()
+            : 'SU';
+
+          const chapterCount = Array.isArray(
+            subject?.chapters
+          )
+            ? subject.chapters.length
+            : 0;
 
           return (
-            <TouchableOpacity 
-              key={subject._id || `subject-${index}`} 
+            <TouchableOpacity
+              key={
+                subject?._id ||
+                `subject-${index}`
+              }
               style={styles.subjectCard}
-              activeOpacity={0.7}
-              onPress={() => handleOpenSubject(subject)}
+              activeOpacity={0.84}
+              onPress={() =>
+                handleOpenSubject(subject)
+              }
             >
-              <View style={styles.subjectCardRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <View style={styles.iconBox}>
-                    <Text style={styles.iconText}>{acronym}</Text>
-                  </View>
-                  <Text style={styles.subjectName} numberOfLines={2}>{subject.name}</Text>
+              <View
+                style={[
+                  styles.subjectAccent,
+                  {
+                    backgroundColor:
+                      palette.accent,
+                  },
+                ]}
+              />
+
+              <View
+                style={[
+                  styles.subjectIcon,
+                  {
+                    backgroundColor:
+                      palette.iconBackground,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.subjectAcronym,
+                    {
+                      color: palette.accent,
+                    },
+                  ]}
+                >
+                  {acronym}
+                </Text>
+              </View>
+
+              <View style={styles.subjectBody}>
+                <Text
+                  style={styles.subjectName}
+                  numberOfLines={2}
+                >
+                  {subject?.name || 'Subject'}
+                </Text>
+
+                <View style={styles.subjectMeta}>
+                  <MaterialCommunityIcons
+                    name="book-outline"
+                    size={13}
+                    color={COLORS.textMuted}
+                  />
+
+                  <Text
+                    style={styles.subjectMetaText}
+                  >
+                    {chapterCount}{' '}
+                    {chapterCount === 1
+                      ? 'Chapter'
+                      : 'Chapters'}
+                  </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#94A3B8" />
+              </View>
+
+              <View
+                style={[
+                  styles.subjectArrow,
+                  {
+                    backgroundColor:
+                      palette.background,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={20}
+                  color={palette.accent}
+                />
               </View>
             </TouchableOpacity>
           );
@@ -200,64 +529,264 @@ export default function StudyCourseDetailScreen({ route, navigation }) {
   };
 
   const renderTestsTab = () => {
-    const tests = course?.tests || [];
-    
     if (tests.length === 0) {
       return (
-        <View style={styles.placeholderBox}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={48} color="#CBD5E1" />
-          <Text style={styles.placeholderTitle}>No Tests Found</Text>
-          <Text style={styles.placeholderDesc}>There are no tests available for this course yet.</Text>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <MaterialCommunityIcons
+              name="clipboard-text-outline"
+              size={46}
+              color={COLORS.primary}
+            />
+          </View>
+
+          <Text style={styles.emptyTitle}>
+            No Tests Found
+          </Text>
+
+          <Text style={styles.emptyDescription}>
+            Tests assigned to this course will
+            appear here.
+          </Text>
         </View>
       );
     }
 
     return (
-      <View style={{ gap: 12 }}>
+      <View style={styles.testList}>
         {tests.map((test, index) => {
-          const scheduledDate = test.scheduledAt ? new Date(test.scheduledAt).toLocaleDateString() : 'Available Now';
+          const scheduledDate =
+            formatScheduledDate(
+              test?.scheduledAt
+            );
+
+          const isBusy =
+            busyTestId === test?._id;
 
           return (
-            <View key={test._id || `test-${index}`} style={styles.testCard}>
-              <View style={styles.testHeader}>
-                 <View style={styles.testTypeWrap}>
-                   <Text style={styles.testType}>{test.testType || 'TEST'}</Text>
-                 </View>
-                 <View style={styles.testDurationWrap}>
-                   <MaterialCommunityIcons name="clock-outline" size={12} color="#64748B" />
-                   <Text style={styles.testDuration}>{test.duration} mins</Text>
-                 </View>
-              </View>
-              
-              <Text style={styles.testName} numberOfLines={2}>{test.name}</Text>
-              {test.syllabus ? <Text style={styles.testSyllabus} numberOfLines={1}>{test.syllabus}</Text> : null}
-              
-              <View style={styles.testDateWrap}>
-                <MaterialCommunityIcons name="calendar-blank-outline" size={14} color="#94A3B8" />
-                <Text style={styles.testDate}>{scheduledDate}</Text>
-              </View>
-              
-              <View style={styles.testActions}>
-                {(!test.attempted || test.mode !== 'real') && (
-                  <TouchableOpacity 
-                    style={[styles.attemptBtn, busyTestId === test._id && styles.startBtnDisabled]}
-                    onPress={() => startTest(test)}
-                    disabled={busyTestId === test._id}
-                  >
-                    {busyTestId === test._id ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.attemptBtnText}>{test.attempted ? 'Retry' : 'Attempt Test'}</Text>
+            <View
+              key={
+                test?._id || `test-${index}`
+              }
+              style={styles.testCard}
+            >
+              <View style={styles.testTopRow}>
+                <View style={styles.testIconWrap}>
+                  <MaterialCommunityIcons
+                    name="clipboard-text-outline"
+                    size={25}
+                    color={COLORS.primary}
+                  />
+                </View>
+
+                <View style={styles.testTopContent}>
+                  <View style={styles.testBadgeRow}>
+                    <View
+                      style={styles.testTypeBadge}
+                    >
+                      <Text
+                        style={styles.testTypeText}
+                      >
+                        {test?.testType || 'TEST'}
+                      </Text>
+                    </View>
+
+                    {test?.attempted && (
+                      <View
+                        style={
+                          styles.attemptedBadge
+                        }
+                      >
+                        <MaterialCommunityIcons
+                          name="check-circle"
+                          size={12}
+                          color={COLORS.success}
+                        />
+
+                        <Text
+                          style={
+                            styles.attemptedText
+                          }
+                        >
+                          Attempted
+                        </Text>
+                      </View>
                     )}
+                  </View>
+
+                  <Text
+                    style={styles.testName}
+                    numberOfLines={2}
+                  >
+                    {test?.name || 'Test'}
+                  </Text>
+                </View>
+              </View>
+
+              {!!test?.syllabus && (
+                <View style={styles.syllabusBox}>
+                  <MaterialCommunityIcons
+                    name="book-open-outline"
+                    size={15}
+                    color={COLORS.primary}
+                  />
+
+                  <Text
+                    style={styles.testSyllabus}
+                    numberOfLines={2}
+                  >
+                    {test.syllabus}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.testInfoRow}>
+                <View style={styles.testInfoItem}>
+                  <View
+                    style={styles.testInfoIcon}
+                  >
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={16}
+                      color={COLORS.primary}
+                    />
+                  </View>
+
+                  <View>
+                    <Text
+                      style={styles.testInfoLabel}
+                    >
+                      Duration
+                    </Text>
+
+                    <Text
+                      style={styles.testInfoValue}
+                    >
+                      {test?.duration || 0} mins
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.testInfoDivider} />
+
+                <View style={styles.testInfoItem}>
+                  <View
+                    style={styles.testInfoIcon}
+                  >
+                    <MaterialCommunityIcons
+                      name="calendar-blank-outline"
+                      size={16}
+                      color={COLORS.primary}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={styles.testInfoLabel}
+                    >
+                      Schedule
+                    </Text>
+
+                    <Text
+                      style={styles.testInfoValue}
+                      numberOfLines={1}
+                    >
+                      {scheduledDate}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.testActions}>
+                {(!test?.attempted ||
+                  test?.mode !== 'real') && (
+                  <TouchableOpacity
+                    style={[
+                      styles.attemptButton,
+                      isBusy &&
+                        styles.buttonDisabled,
+                    ]}
+                    activeOpacity={0.84}
+                    disabled={isBusy}
+                    onPress={() =>
+                      startTest(test)
+                    }
+                  >
+                    <LinearGradient
+                      colors={[
+                        COLORS.primary,
+                        '#8B5CF6',
+                      ]}
+                      start={{
+                        x: 0,
+                        y: 0,
+                      }}
+                      end={{
+                        x: 1,
+                        y: 0,
+                      }}
+                      style={
+                        styles.attemptButtonGradient
+                      }
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator
+                          color="#FFFFFF"
+                          size="small"
+                        />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons
+                            name={
+                              test?.attempted
+                                ? 'refresh'
+                                : 'play-circle-outline'
+                            }
+                            size={18}
+                            color="#FFFFFF"
+                          />
+
+                          <Text
+                            style={
+                              styles.attemptButtonText
+                            }
+                          >
+                            {test?.attempted
+                              ? 'Retry Test'
+                              : 'Attempt Test'}
+                          </Text>
+                        </>
+                      )}
+                    </LinearGradient>
                   </TouchableOpacity>
                 )}
-                
-                {test.attempted && (
+
+                {test?.attempted && (
                   <TouchableOpacity
-                    style={styles.resultBtn}
-                    onPress={() => navigation.navigate('TestResult', { testId: test._id })}
+                    style={styles.resultButton}
+                    activeOpacity={0.82}
+                    onPress={() =>
+                      navigation.navigate(
+                        'TestResult',
+                        {
+                          testId: test._id,
+                        }
+                      )
+                    }
                   >
-                    <Text style={styles.resultBtnText}>Result</Text>
+                    <MaterialCommunityIcons
+                      name="chart-box-outline"
+                      size={18}
+                      color={COLORS.primary}
+                    />
+
+                    <Text
+                      style={
+                        styles.resultButtonText
+                      }
+                    >
+                      View Result
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -268,291 +797,1007 @@ export default function StudyCourseDetailScreen({ route, navigation }) {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <AppHeader
-        title={course?.name || "Study Room"}
-        navigation={navigation}
-        showBack={true}
-      />
+  if (loading) {
+    return (
+      <>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.primaryDark}
+        />
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1D4ED8" />
-        </View>
-      ) : course ? (
-        <View style={styles.container}>
-          {/* Custom Tabs */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity 
-              style={[styles.tabItem, activeTab === 'Subjects' && styles.tabItemActive]}
-              onPress={() => setActiveTab('Subjects')}
-            >
-              <Text style={[styles.tabText, activeTab === 'Subjects' && styles.tabTextActive]}>Subjects</Text>
-            </TouchableOpacity>
+        <SafeAreaView
+          style={styles.safeArea}
+          edges={['top']}
+        >
+          <LinearGradient
+            colors={[
+              COLORS.primaryDark,
+              COLORS.primary,
+            ]}
+            style={styles.loadingHeader}
+          />
 
-            <TouchableOpacity 
-              style={[styles.tabItem, activeTab === 'Tests' && styles.tabItemActive]}
-              onPress={() => setActiveTab('Tests')}
-            >
-              <Text style={[styles.tabText, activeTab === 'Tests' && styles.tabTextActive]}>Tests</Text>
-            </TouchableOpacity>
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingIconWrap}>
+              <MaterialCommunityIcons
+                name="school-outline"
+                size={42}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <ActivityIndicator
+              size="large"
+              color={COLORS.primary}
+            />
+
+            <Text style={styles.loadingTitle}>
+              Loading Study Room...
+            </Text>
+
+            <Text style={styles.loadingSubtitle}>
+              Preparing your course content
+            </Text>
+          </View>
+        </SafeAreaView>
+      </>
+    );
+  }
+
+  if (!course) {
+    return (
+      <SafeAreaView
+        style={styles.errorSafeArea}
+        edges={['top']}
+      >
+        <View style={styles.errorState}>
+          <View style={styles.errorIcon}>
+            <MaterialCommunityIcons
+              name="book-alert-outline"
+              size={48}
+              color={COLORS.danger}
+            />
           </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
-            {activeTab === 'Subjects' ? renderSubjectsTab() : renderTestsTab()}
-          </ScrollView>
+          <Text style={styles.errorTitle}>
+            Course Not Found
+          </Text>
+
+          <Text style={styles.errorDescription}>
+            We could not find this course.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.goBackButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.goBackButtonText}>
+              Go Back
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>Course not found.</Text>
-        </View>
-      )}
-    </SafeAreaView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primaryDark}
+      />
+
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={['top']}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
+          contentContainerStyle={styles.scrollContent}
+        >
+          <LinearGradient
+            colors={[
+              COLORS.primaryDark,
+              COLORS.primary,
+              '#8B5CF6',
+            ]}
+            start={{
+              x: 0,
+              y: 0,
+            }}
+            end={{
+              x: 1,
+              y: 1,
+            }}
+            style={styles.hero}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                activeOpacity={0.8}
+                onPress={() => navigation.goBack()}
+              >
+                <MaterialCommunityIcons
+                  name="arrow-left"
+                  size={23}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <View style={styles.headerContent}>
+                <Text style={styles.headerLabel}>
+                  STUDY ROOM
+                </Text>
+
+                <Text
+                  style={styles.headerTitle}
+                  numberOfLines={1}
+                >
+                  {course?.name || 'Course'}
+                </Text>
+              </View>
+
+              <View style={styles.headerButton}>
+                <MaterialCommunityIcons
+                  name="school-outline"
+                  size={23}
+                  color="#FFFFFF"
+                />
+              </View>
+            </View>
+
+            <View style={styles.heroContent}>
+              <View style={styles.heroIcon}>
+                <MaterialCommunityIcons
+                  name="book-open-page-variant-outline"
+                  size={31}
+                  color="#FFFFFF"
+                />
+              </View>
+
+              <View style={styles.heroTextContent}>
+                <Text style={styles.heroLabel}>
+                  CONTINUE LEARNING
+                </Text>
+
+                <Text
+                  style={styles.heroTitle}
+                  numberOfLines={2}
+                >
+                  {course?.name || 'Your Course'}
+                </Text>
+
+                <Text style={styles.heroSubtitle}>
+                  Explore subjects, chapters and tests
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="book-multiple-outline"
+                  size={19}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.statValue}>
+                  {subjects.length}
+                </Text>
+
+                <Text style={styles.statLabel}>
+                  Subjects
+                </Text>
+              </View>
+
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="clipboard-text-outline"
+                  size={19}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.statValue}>
+                  {tests.length}
+                </Text>
+
+                <Text style={styles.statLabel}>
+                  Tests
+                </Text>
+              </View>
+
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="check-decagram-outline"
+                  size={19}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.statValue}>
+                  Active
+                </Text>
+
+                <Text style={styles.statLabel}>
+                  Access
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          <View style={styles.stickyTabContainer}>
+            <View style={styles.tabBar}>
+              <TouchableOpacity
+                style={[
+                  styles.tabItem,
+                  activeTab === 'Subjects' &&
+                    styles.tabItemActive,
+                ]}
+                activeOpacity={0.8}
+                onPress={() =>
+                  setActiveTab('Subjects')
+                }
+              >
+                <MaterialCommunityIcons
+                  name={
+                    activeTab === 'Subjects'
+                      ? 'book-open-page-variant'
+                      : 'book-open-page-variant-outline'
+                  }
+                  size={18}
+                  color={
+                    activeTab === 'Subjects'
+                      ? COLORS.primary
+                      : COLORS.textSecondary
+                  }
+                />
+
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'Subjects' &&
+                      styles.tabTextActive,
+                  ]}
+                >
+                  Subjects
+                </Text>
+
+                <View
+                  style={[
+                    styles.tabCount,
+                    activeTab === 'Subjects' &&
+                      styles.tabCountActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabCountText,
+                      activeTab === 'Subjects' &&
+                        styles.tabCountTextActive,
+                    ]}
+                  >
+                    {subjects.length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.tabItem,
+                  activeTab === 'Tests' &&
+                    styles.tabItemActive,
+                ]}
+                activeOpacity={0.8}
+                onPress={() =>
+                  setActiveTab('Tests')
+                }
+              >
+                <MaterialCommunityIcons
+                  name={
+                    activeTab === 'Tests'
+                      ? 'clipboard-text'
+                      : 'clipboard-text-outline'
+                  }
+                  size={18}
+                  color={
+                    activeTab === 'Tests'
+                      ? COLORS.primary
+                      : COLORS.textSecondary
+                  }
+                />
+
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === 'Tests' &&
+                      styles.tabTextActive,
+                  ]}
+                >
+                  Tests
+                </Text>
+
+                <View
+                  style={[
+                    styles.tabCount,
+                    activeTab === 'Tests' &&
+                      styles.tabCountActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabCountText,
+                      activeTab === 'Tests' &&
+                        styles.tabCountTextActive,
+                    ]}
+                  >
+                    {tests.length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.content}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>
+                  {activeTab === 'Subjects'
+                    ? 'Course Subjects'
+                    : 'Course Tests'}
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  {activeTab === 'Subjects'
+                    ? 'Choose a subject to continue learning'
+                    : 'Practice and measure your performance'}
+                </Text>
+              </View>
+            </View>
+
+            {activeTab === 'Subjects'
+              ? renderSubjectsTab()
+              : renderTestsTab()}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
-  container: { flex: 1 },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorText: { fontSize: 16, color: "#EF4444" },
-  
-  tabBar: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.primaryDark,
+  },
+
+  errorSafeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: COLORS.background,
+    paddingBottom: 115,
+  },
+
+  hero: {
+    paddingBottom: 22,
+  },
+
+  header: {
+    minHeight: 67,
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
     paddingHorizontal: 16,
-  },
-  tabItem: {
-    paddingVertical: 14,
-    marginRight: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabItemActive: {
-    borderBottomColor: '#1D4ED8',
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  tabTextActive: {
-    color: '#1D4ED8',
-    fontWeight: '800',
+    gap: 12,
   },
 
-  content: { 
-    padding: SCREEN_PADDING, 
-    paddingBottom: 40 
-  },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginTop: 20,
-    textAlign: 'center',
-  },
-
-  gridWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  subjectCard: {
-    width: CARD_WIDTH,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: GRID_GAP,
-    justifyContent: 'space-between',
-    minHeight: 110,
-    shadowColor: '#0B1220',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  subjectCardRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconText: {
-    color: '#1D4ED8',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  subjectName: {
+
+  headerContent: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E293B',
-    lineHeight: 18,
   },
-  progressRow: {
+
+  headerLabel: {
+    color: '#DDD6FE',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+
+  heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingTop: 11,
+  },
+
+  heroIcon: {
+    width: 63,
+    height: 63,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.19)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+
+  heroTextContent: {
+    flex: 1,
+  },
+
+  heroLabel: {
+    color: '#DDD6FE',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+  },
+
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+
+  heroSubtitle: {
+    color: '#DDD6FE',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 5,
+  },
+
+  statsRow: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    minHeight: 75,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.17)',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  statValue: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+
+  statLabel: {
+    color: '#DDD6FE',
+    fontSize: 8,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  statDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+
+  stickyTabContainer: {
+    backgroundColor: COLORS.background,
+    paddingTop: 10,
+    paddingBottom: 5,
+  },
+
+  tabBar: {
+    marginHorizontal: 15,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 5,
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    shadowColor: '#4C1D95',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  tabItem: {
+    flex: 1,
+    minHeight: 45,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
-  progressBarWrap: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#22C55E',
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
+
+  tabItemActive: {
+    backgroundColor: COLORS.primarySoft,
   },
 
-  placeholderBox: {
-    marginTop: 40,
+  tabText: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  tabTextActive: {
+    color: COLORS.primary,
+  },
+
+  tabCount: {
+    minWidth: 21,
+    height: 21,
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+  },
+
+  tabCountActive: {
+    backgroundColor: COLORS.primaryLight,
+  },
+
+  tabCountText: {
+    color: COLORS.textSecondary,
+    fontSize: 8,
+    fontWeight: '900',
+  },
+
+  tabCountTextActive: {
+    color: COLORS.primary,
+  },
+
+  content: {
+    paddingHorizontal: 15,
+    paddingTop: 18,
+  },
+
+  sectionHeader: {
+    marginBottom: 15,
+  },
+
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+
+  sectionSubtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
+  subjectList: {
+    gap: 11,
+  },
+
+  subjectCard: {
+    minHeight: 82,
+    backgroundColor: COLORS.white,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
-  },
-  placeholderTitle: {
-    marginTop: 12,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  placeholderDesc: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  
-  testCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#0B1220',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  testHeader: {
+    borderColor: COLORS.border,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    paddingRight: 13,
+    overflow: 'hidden',
+
+    shadowColor: '#4C1D95',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 9,
+    elevation: 2,
   },
-  testTypeWrap: {
-    backgroundColor: '#FFEDD5',
-    paddingHorizontal: 8,
+
+  subjectAccent: {
+    width: 5,
+    alignSelf: 'stretch',
+    marginRight: 12,
+  },
+
+  subjectIcon: {
+    width: 49,
+    height: 49,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  subjectAcronym: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  subjectBody: {
+    flex: 1,
+    paddingVertical: 13,
+  },
+
+  subjectName: {
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '900',
+  },
+
+  subjectMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+  },
+
+  subjectMetaText: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+
+  subjectArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  testList: {
+    gap: 13,
+  },
+
+  testCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 15,
+
+    shadowColor: '#4C1D95',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  testTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+
+  testIconWrap: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+
+  testTopContent: {
+    flex: 1,
+  },
+
+  testBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 5,
+  },
+
+  testTypeBadge: {
+    backgroundColor: COLORS.orangeLight,
+    paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  testType: {
-    color: '#EA580C',
-    fontSize: 10,
-    fontWeight: '700',
+
+  testTypeText: {
+    color: COLORS.orange,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  testDurationWrap: {
+
+  attemptedBadge: {
+    backgroundColor: COLORS.successLight,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
   },
-  testDuration: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#64748B',
+
+  attemptedText: {
+    color: COLORS.success,
+    fontSize: 8,
+    fontWeight: '800',
   },
+
   testName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1E293B',
+    color: COLORS.text,
+    fontSize: 14,
     lineHeight: 20,
-    marginBottom: 4,
+    fontWeight: '900',
   },
+
+  syllabusBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    backgroundColor: COLORS.primarySoft,
+    borderRadius: 11,
+    padding: 10,
+    marginTop: 13,
+  },
+
   testSyllabus: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 8,
+    flex: 1,
+    color: COLORS.primaryDark,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '600',
   },
-  testDateWrap: {
+
+  testInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-    marginBottom: 16,
+    backgroundColor: '#FAFAFC',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 9,
+    marginTop: 12,
   },
-  testDate: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
+
+  testInfoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
+
+  testInfoIcon: {
+    width: 31,
+    height: 31,
+    borderRadius: 10,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  testInfoDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
+  },
+
+  testInfoLabel: {
+    color: COLORS.textMuted,
+    fontSize: 7,
+    fontWeight: '700',
+  },
+
+  testInfoValue: {
+    color: COLORS.text,
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+
   testActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 9,
+    marginTop: 13,
   },
-  attemptBtn: {
+
+  attemptButton: {
     flex: 1,
-    backgroundColor: '#1E293B',
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  attemptButtonGradient: {
+    minHeight: 44,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 10,
   },
-  attemptBtnText: {
+
+  attemptButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '900',
   },
-  resultBtn: {
+
+  resultButton: {
     flex: 1,
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 12,
-    borderRadius: 10,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    backgroundColor: COLORS.primarySoft,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+    gap: 7,
+    paddingHorizontal: 10,
   },
-  resultBtnText: {
-    color: '#1D4ED8',
-    fontSize: 13,
-    fontWeight: '700',
+
+  resultButtonText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '900',
   },
-  startBtnDisabled: {
-    opacity: 0.7,
+
+  buttonDisabled: {
+    opacity: 0.65,
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 25,
+  },
+
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 32,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 18,
+  },
+
+  emptyDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 7,
+  },
+
+  loadingHeader: {
+    height: 68,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingIconWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: 28,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+
+  loadingTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 15,
+  },
+
+  loadingSubtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 5,
+  },
+
+  errorState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 25,
+  },
+
+  errorIcon: {
+    width: 95,
+    height: 95,
+    borderRadius: 32,
+    backgroundColor: COLORS.dangerLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  errorTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 18,
+  },
+
+  errorDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 7,
+  },
+
+  goBackButton: {
+    minHeight: 44,
+    borderRadius: 13,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 19,
+  },
+
+  goBackButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
   },
 });
